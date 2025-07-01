@@ -1,33 +1,30 @@
-// Aijob.jsx
-
+// src/components/aijob.jsx
 import React, { useState } from "react";
-import styled from "styled-components";
 import Sidebar from "./Sidebar";
 import MainContent from "./maincontent";
 
 export default function Aijob() {
+  const [selectedPage, setSelectedPage] = useState("dashboard"); // 대시보드 시작
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedPage, setSelectedPage] = useState("dashboard");
+  const [darkMode, setDarkMode] = useState(true); // 다크모드 상태
+
+  const toggleTheme = () => setDarkMode((prev) => !prev); // 스위치 버튼 핸들러
 
   return (
-    <Layout>
+    <div style={{ display: "flex" }}>
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
         selectedPage={selectedPage}
         setSelectedPage={setSelectedPage}
+        darkMode={darkMode}
       />
       <MainContent
         selectedPage={selectedPage}
         setSelectedPage={setSelectedPage}
+        darkMode={darkMode}
+        toggleTheme={toggleTheme}
       />
-    </Layout>
+    </div>
   );
 }
-
-const Layout = styled.div`
-  display: flex;
-  height: 100vh;
-  background: rgb(36, 36, 35);
-  overflow: hidden;
-`;

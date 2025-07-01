@@ -6,8 +6,7 @@ import Logout from "./components/logout";
 import Login from "./components/login";
 import Aijob from "./components/aijob";
 import NaverCallback from "./components/navercallback";
-
-
+import GuestDashboard from "./components/guestdashboard";
 
 
 export default function App() {
@@ -20,6 +19,8 @@ export default function App() {
         <Route path="/logout" element={<Logout/>} />
         <Route path="/aijob" element={<Aijob />} />
         <Route path="/navercallback" element={<NaverCallback />} />
+        <Route path="/guestdashboard" element={<GuestDashboard /> } />
+        
     
       </Routes>
     </Router>
