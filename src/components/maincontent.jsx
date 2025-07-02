@@ -7,6 +7,12 @@ import {
   FaCheckCircle,
   FaRegCircle,
 } from "react-icons/fa";
+import TodoList from "./TodoList";
+import PromptBar from "./PromptBar";
+import ProfileMenu from "./ProfileMenu";
+import CareerRoadmapMain from "./CareerRoadmapMain";
+import CareerRoadmapDetail from "./CareerRoadmapDetail";
+
 
 const LANDING_PAGE = "dashboard";
 
@@ -17,11 +23,8 @@ export default function MainContent({
   toggleTheme,
 }) {
   /* ───────── 상태 ───────── */
-  const [showProfile, setShowProfile] = useState(false);
-  const profileRef = useRef(null);
-
+  
   /* ▼ AI 추천 공고용 상태 */
-  const [userQuery, setUserQuery] = useState("");
   const [aiMessage, setAiMessage] = useState("");
   const [recommendations, setRecommendations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,25 +97,24 @@ export default function MainContent({
   }
 
   /* ───────── 추천 호출 ───────── */
-  const handlePromptSubmit = async (inputQuery) => {
+  const handlePromptSubmit = async (query) => {
     if (selectedPage !== "ai-jobs") return;
-
-    const query = inputQuery !== undefined ? inputQuery : userQuery;
-    if (!query.trim()) return;
-
+  
+    if (!query.trim()) return; // 빈 문자열 방지
+  
     if (isGuest && guestUses >= 20) {
       alert(
         "게스트는 AI 추천 공고 기능을 20회까지 이용할 수 있습니다.\n회원가입 후 계속 이용해 주세요!"
       );
       return;
     }
-
+  
     setIsLoading(true);
     try {
-      const res = await fetchAiJobRecommendation(query);
+      const res = await fetchAiJobRecommendation(query); // ← 쿼리 직접 사용
       setAiMessage(res.explanation);
       setRecommendations(res.jobs);
-      setUserQuery(query);
+  
       if (isGuest) {
         const newCnt = guestUses + 1;
         setGuestUses(newCnt);
@@ -124,6 +126,7 @@ export default function MainContent({
       setIsLoading(false);
     }
   };
+  
 
   /* ▼ 예시 질문 클릭 */
   const handleExampleClick = (prompt) => {
@@ -139,13 +142,13 @@ export default function MainContent({
   /* ───────── 랜딩 카드(홈) ───────── */
   function LandingCards({ setSelectedPage }) {
     const preview = [
-      { company: "네이버", match: 95, dday: 3 },
-      { company: "카카오", match: 88, dday: 5 },
-      { company: "삼성전자", match: 84, dday: 1 },
-      { company: "LG CNS", match: 77, dday: 2 },
-      { company: "쿠팡", match: 72, dday: 7 },
+      { company: "네이버", match: 95, size: "대기업" },
+      { company: "카카오", match: 88, size: "대기업" },
+      { company: "삼성전자", match: 84, size: "대기업" },
+      { company: "LG CNS", match: 77, size: "중견기업" },
+      { company: "쿠팡", match: 72, size: "대기업" },
     ];
-
+  
     return (
       <>
         {/* 상단 카드 2개 */}
@@ -165,16 +168,30 @@ export default function MainContent({
               <HighlightBar />
               <span>AI 추천 공고</span>
             </SectionTitle>
-            <DescText>데이터 분석가에게 맞는 기업을 추천했어요</DescText>
+  
+            <IntroText
+              style={{
+                fontSize: "0.92rem",
+                marginTop: "0.7rem",
+                marginBottom: "2rem",
+                textAlign: "left",
+                lineHeight: "1.5",
+              }}
+            >
+              김취준님의 이력과 관심사를 바탕으로<br />
+              데이터 분석 직무에 맞는 기업을 골라봤어요
+            </IntroText>
+  
             <ColumnHeader>
               <ColumnTitle style={{ flex: 1.2, textAlign: "left" }}>기업명</ColumnTitle>
               <ColumnTitle
                 style={{ flex: 0.8, textAlign: "left", paddingLeft: "2.2rem" }}
               >
-                마감기간
+                기업 규모
               </ColumnTitle>
               <ColumnTitle style={{ flex: 0.6, textAlign: "right" }}>적합도</ColumnTitle>
             </ColumnHeader>
+  
             <PreviewList>
               {preview.map((p, idx) => (
                 <PreviewItem key={p.company}>
@@ -183,14 +200,15 @@ export default function MainContent({
                       {idx + 1}. {p.company}
                     </strong>
                   </CompanyName>
-                  <Deadline>D-{p.dday}</Deadline>
+                  <Deadline>{p.size}</Deadline>
                   <MatchPercent $match={p.match}>{p.match}%</MatchPercent>
                 </PreviewItem>
               ))}
             </PreviewList>
+  
             <HintText>(클릭하면 상세 보기)</HintText>
           </HoverCard>
-
+  
           {/* To-do 카드 */}
           <HoverCard
             $darkMode={darkMode}
@@ -200,29 +218,20 @@ export default function MainContent({
               alignItems: "flex-start",
               justifyContent: "flex-start",
               padding: "2.2rem 2rem 1.6rem",
-              textAlign: "left",
-              gap: "1.2rem",
+              gap: "1.4rem",
             }}
           >
             <SectionTitle style={{ fontSize: "1.7rem" }}>
               <HighlightBar />
               <span>To-do List</span>
             </SectionTitle>
-
-            <IntroText>
-              매일 해야 할 일을 캘린더에 정리하고,
-              <br />
-              날짜별로 한눈에 확인하세요
-            </IntroText>
-
-            <FeatureList>
-              <li>📅 달력 기반 날짜별 할 일 관리</li>
-              <li>📝 하루 일정 직접 작성 및 수정</li>
-              <li>✅ 완료 체크 및 자동 정렬</li>
-              <li>📊 주간/월간 일정 요약 제공</li>
-              <li>🤖 AI 기반 일정 추천 (준비 중)</li>
-            </FeatureList>
-
+  
+            {/* 미니 캘린더 */}
+            <MiniCalendar />
+  
+            {/* 오늘의 할 일 미리보기 */}
+            <TodoPreviewList />
+  
             <HintText>(클릭하면 오늘의 할 일로 이동)</HintText>
           </HoverCard>
         </MainCards>
@@ -303,6 +312,69 @@ export default function MainContent({
     );
   }
 
+  function MiniCalendar() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+  
+    const cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= lastDate; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+  
+    return (
+      <CalendarGrid>
+        {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+          <CalHeader key={d}>{d}</CalHeader>
+        ))}
+        {cells.map((d, i) => (
+          <CalCell key={i} $today={d === today.getDate()}>
+            {d || ""}
+          </CalCell>
+        ))}
+      </CalendarGrid>
+    );
+  }
+  
+  function TodoPreviewList() {
+    const [todayTasks, setTodayTasks] = React.useState([]);
+  
+    useEffect(() => {
+      const todayKey = new Date().toISOString().slice(0, 10);      // YYYY-MM-DD
+      const saved = JSON.parse(localStorage.getItem("tasks") || "{}");
+  
+      // ▶︎ 최대 4개만 미리보기
+      setTodayTasks((saved[todayKey] || []).slice(0, 4));
+  
+      // storage 변화(다른 탭·컴포넌트) 감지
+      const listener = () => {
+        const updated = JSON.parse(localStorage.getItem("tasks") || "{}");
+        setTodayTasks((updated[todayKey] || []).slice(0, 4));
+      };
+      window.addEventListener("storage", listener);
+      return () => window.removeEventListener("storage", listener);
+    }, []);
+  
+    return (
+      <PreviewTasks>
+        {todayTasks.length === 0 ? (
+          <NoTask>오늘 할 일이 없습니다</NoTask>
+        ) : (
+          todayTasks.map((t, i) => (
+            <TaskItem key={i}>
+              <input type="checkbox" checked={t.done} readOnly />
+              <span>{t.text}</span>
+            </TaskItem>
+          ))
+        )}
+      </PreviewTasks>
+    );
+  }
+  
+  
+
   /* ───────── AI 추천 공고 페이지 ───────── */
   function AiJobsPage({ $darkMode }) {
     return (
@@ -358,7 +430,7 @@ export default function MainContent({
                 onClick={() => {
                   setAiMessage("");
                   setRecommendations([]);
-                  setUserQuery("");
+                
                   setSelectedExample(null);
                 }}
               >
@@ -382,130 +454,19 @@ export default function MainContent({
     );
   }
 
-  /* ───────── 커리어 로드맵 메인(섹션 카드 3개) ───────── */
-  function RoadmapMain() {
-    const sections = [
-      {
-        id: "analysis",
-        label: "공고 분석",
-        desc: "공고 핵심 키워드를 추출합니다.",
-        color: "#fdf5dd",
-      },
-      {
-        id: "gap",
-        label: "갭 분석",
-        desc: "내 이력서와 공고를 비교합니다.",
-        color: "#f3f1eb",
-      },
-      {
-        id: "plan",
-        label: "극복 방안",
-        desc: "부족한 부분 학습 계획을 제안합니다.",
-        color: "#efeffa",
-      },
-    ];
-  
-    return (
-      <Card $darkMode={darkMode} style={{ padding: "2.5rem", alignItems: "center" }}>
-        <FlowRow>
-          {sections.map((s, i) => (
-            <React.Fragment key={s.id}>
-              <RoadmapCard
-                $darkMode={darkMode}
-                $bg={s.color}
-                onClick={() => setRoadmapSection(s.id)}
-              >
-                <h3>{s.label}</h3>
-                <p>{s.desc}</p>
-                <SmallHint>(클릭하면 상세 보기)</SmallHint>
-              </RoadmapCard>
-              {i < sections.length - 1 && <ArrowBox>→</ArrowBox>}
-            </React.Fragment>
-          ))}
-        </FlowRow>
-      </Card>
-    );
-  }
-  
-  
-  
 
-  /* ───────── 커리어 로드맵 상세 ───────── */
-  function RoadmapDetail({ section }) {
-    const titles = {
-      analysis: "공고 분석",
-      gap: "갭 분석",
-      plan: "극복 방안",
-    };
-    const dummy = {
-      analysis: [
-        "• 요구 기술 키워드 12개 추출",
-        "• 우대 조건 3건 요약",
-        "• 직무 핵심 역량 그래프",
-      ],
-      gap: [
-        "• 기술 스택 일치율 68%",
-        "• 프로젝트 경험 부족 2건",
-        "• 학위/자격증 요구 사항 없음",
-      ],
-      plan: [
-        "• React 심화 강의(2주)",
-        "• 사이드 프로젝트 1건 제안",
-        "• 알고리즘 풀이 주 3회 추천",
-      ],
-    };
 
-    return (
-      <DetailCard $darkMode={darkMode}>
-        <SectionHeader>
-          <LocalBack onClick={() => setRoadmapSection(null)}>
-            <FaArrowLeft /> 뒤로가기
-          </LocalBack>
-          <h2>{titles[section]}</h2>
-        </SectionHeader>
-
-        <DetailList>
-          {dummy[section].map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </DetailList>
-      </DetailCard>
-    );
-  }
-
-  /* ───────── 바깥 클릭 시 프로필 닫기 ───────── */
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setShowProfile(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   /* ───────── 렌더 ───────── */
   return (
     <Main $darkMode={darkMode}>
       {/* ─── 헤더 ─── */}
       <HeaderWrapper>
-        <Header $darkMode={darkMode}>성재 님, 만나서 반갑습니다</Header>
-        <ProfileMenu ref={profileRef}>
-          <ToggleWrapper>
-            <SwitchWrapper onClick={toggleTheme} $darkMode={darkMode}>
-              <SwitchKnob $darkMode={darkMode} />
-            </SwitchWrapper>
-            <ProfileIcon onClick={() => setShowProfile((p) => !p)}>
-              <FaUserCircle />
-            </ProfileIcon>
-          </ToggleWrapper>
-          {showProfile && (
-            <Dropdown $darkMode={darkMode}>
-              <DropdownItem $darkMode={darkMode}>프로필 수정</DropdownItem>
-              <DropdownItem $darkMode={darkMode}>로그아웃</DropdownItem>
-            </Dropdown>
-          )}
-        </ProfileMenu>
+        <Header $darkMode={darkMode}>김취준님, 
+          만나서 반갑습니다 
+        </Header>
+        <ProfileMenu darkMode={darkMode} toggleTheme={toggleTheme} />
+
       </HeaderWrapper>
 
       {/* ─── 본문 ─── */}
@@ -528,43 +489,55 @@ export default function MainContent({
           {/* AI 추천 공고 페이지 */}
           {selectedPage === "ai-jobs" && <AiJobsPage $darkMode={darkMode} />}
 
-          {/* 커리어 로드맵 페이지 */}
           {selectedPage === "career-roadmap" &&
-            (roadmapSection ? (
-              <RoadmapDetail section={roadmapSection} />
-            ) : (
-              <RoadmapMain />
-            ))}
+  (roadmapSection ? (
+    <CareerRoadmapDetail
+      section={roadmapSection}
+      darkMode={darkMode}
+      onBack={() => setRoadmapSection(null)} // ← 뒤로가기 클릭 시 null로 초기화
+    />
+  ) : (
+    <CareerRoadmapMain
+      darkMode={darkMode}
+      onSelect={(id) => setRoadmapSection(id)} // ← 카드 클릭 시 section ID 설정
+    />
+  ))}
+
 
           {/* 기타 페이지 공통 카드 */}
-          {selectedPage !== "ai-jobs" &&
-            selectedPage !== "career-roadmap" &&
-            pages.includes(selectedPage) && (
-              <Card $darkMode={darkMode}>
-                <h2>{pageTitle[selectedPage]}</h2>
-                <p>{pageDesc[selectedPage]}</p>
-              </Card>
-            )}
+          {selectedPage === "todo" ? (
+  <Card $darkMode={darkMode} style={{ padding: "2.5rem" }}>
+    {/* To-do List 타이틀 */}
+    <SectionTitle style={{ fontSize: "1.9rem", marginBottom: "1.4rem" }}>
+      <HighlightBar />
+      <span></span>
+    </SectionTitle>
+
+    {/* 할 일 캘린더 + 체크리스트 */}
+    <TodoList darkMode={darkMode} />
+  </Card>
+) : (
+  selectedPage !== "ai-jobs" &&
+  selectedPage !== "career-roadmap" &&
+  pages.includes(selectedPage) && (
+    <Card $darkMode={darkMode}>
+      <h2>{pageTitle[selectedPage]}</h2>
+      <p>{pageDesc[selectedPage]}</p>
+    </Card>
+  )
+)}
+
+
         </Scrollable>
       </ContentArea>
 
       {/* ─── 공통 프롬프트 ─── */}
-      <PromptWrapper>
-        <Prompt $darkMode={darkMode}>
-          <PromptText>JOB자에게 메시지</PromptText>
-          <PromptInput
-            placeholder={
-              selectedPage === "ai-jobs"
-                ? "추천받고 싶은 조건을 입력하세요…"
-                : "무엇이든 물어보세요…"
-            }
-            $darkMode={darkMode}
-            value={userQuery}
-            onChange={(e) => setUserQuery(e.target.value)}
-          />
-          <PromptButton onClick={() => handlePromptSubmit()}>전송</PromptButton>
-        </Prompt>
-      </PromptWrapper>
+              
+        <PromptBar
+          darkMode={darkMode}
+          activePage={selectedPage}
+          onSubmit={handlePromptSubmit}
+        />
     </Main>
   );
 }
@@ -601,7 +574,7 @@ const HeaderWrapper = styled.div`
   justify-content: center;
   align-items: center;
   position: relative;
-  padding: 4rem 0;
+  padding: 2rem 0;
 `;
 const Header = styled.h1`
   font-size: 2rem;
@@ -632,11 +605,6 @@ const SwitchKnob = styled.div`
   transition: left 0.3s;
 `;
 
-const ProfileMenu = styled.div`
-  position: absolute;
-  top: 1.2rem;
-  right: 2rem;
-`;
 const ProfileIcon = styled.div`
   font-size: 1.8rem;
   color: #ccc;
@@ -1256,4 +1224,58 @@ const DetailList = styled.ul`
   padding-left: 1.4rem;
   line-height: 1.8;
   font-size: 0.97rem;
+`;
+
+
+
+
+
+
+
+const CalendarGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.2rem;
+  width: 100%;
+`;
+const CalHeader = styled.div`
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.8;
+`;
+const CalCell = styled.div`
+  height: 22px;
+  font-size: 0.7rem;
+  text-align: center;
+  line-height: 22px;
+  border-radius: 4px;
+  ${({ $today }) =>
+    $today && css`
+      background: #ffc107;
+      color: #000;
+      font-weight: 700;
+    `}
+`;
+
+const PreviewTasks = styled.ul`
+  list-style: none;
+  padding-left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+`;
+const TaskItem = styled.li`
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  input {
+    pointer-events: none;
+  }
+`;
+const NoTask = styled.li`
+  font-size: 0.8rem;
+  color: #777;
 `;

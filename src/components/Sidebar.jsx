@@ -16,8 +16,8 @@ export default function Sidebar({
   const [careerOpen, setCareerOpen] = useState(true); // 디폴트 열림
 
   const careerSubpages = [
-    { key: "career-summary", label: "요약" },
-    { key: "career-requirements", label: "직무 요구사항" },
+    { key: "career-summary", label: "종합" },
+    { key: "career-requirements", label: "공고 분석" },
     { key: "career-gap", label: "갭 분석" },
     { key: "career-plan", label: "극복 방안" }
   ];
@@ -54,7 +54,10 @@ export default function Sidebar({
             <strong>커리어 로드맵</strong>
           </NavText>
           {!collapsed && (
-            <ArrowIcon>{careerOpen ? <IoIosArrowDown /> : <IoIosArrowForward />}</ArrowIcon>
+            <ArrowIcon open={careerOpen}>
+            <IoIosArrowDown />
+          </ArrowIcon>
+          
           )}
         </NavItem>
 
@@ -139,7 +142,14 @@ const NavItem = styled.div`
 const ArrowIcon = styled.div`
   margin-left: auto;
   font-size: 1rem;
+  transition: transform 0.25s ease;  // ← 추가
+
+  ${({ open }) =>
+    open
+      ? css`transform: rotate(0deg);`
+      : css`transform: rotate(-90deg);`}
 `;
+
 
 const SubItem = styled.div`
   display:flex; align-items:center; gap:0.4rem;
@@ -147,11 +157,18 @@ const SubItem = styled.div`
   margin-left: 0.2rem;
   font-size: 0.95rem;
   cursor:pointer; border-radius:0.4rem;
-  ${({$darkMode})=>$darkMode?css`
-    &:hover { background:#3a3a3a; strong{color:#ffc107;} }
-  `:css`
-    &:hover { background: #f0ebe3; strong{color: #d39b00;} }
-  `}
+  ${({$darkMode}) => $darkMode ? css`
+  &:hover {
+    background: #3a3a3a;
+    strong { color: #ffc107; }
+  }
+` : css`
+  &:hover {
+    background: rgb(248, 211, 99);
+    strong { color: rgb(26, 25, 24); }
+  }
+`}
+
 `;
 
 const Dot = styled.span`
