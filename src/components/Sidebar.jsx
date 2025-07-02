@@ -1,24 +1,34 @@
-// components/Sidebar.jsx
-import React from "react";
+import React, { useState } from "react";
 import styled, { css } from "styled-components";
 import {
-  FaBullseye, FaClipboardList, FaHeart, FaComments, FaRocket,
+  FaBullseye, FaClipboardList, FaHeart, FaRocket,
   FaSearch, FaBars, FaHistory, FaHome
 } from "react-icons/fa";
+import { IoIosArrowDown, IoIosArrowForward } from "react-icons/io"; // 토글 아이콘
 
 export default function Sidebar({
   collapsed,
   setCollapsed,
   selectedPage,
   setSelectedPage,
-  darkMode            // ⬅ 부모에서 전달
+  darkMode
 }) {
+  const [careerOpen, setCareerOpen] = useState(true); // 디폴트 열림
+
+  const careerSubpages = [
+    { key: "career-summary", label: "요약" },
+    { key: "career-requirements", label: "직무 요구사항" },
+    { key: "career-gap", label: "갭 분석" },
+    { key: "career-plan", label: "극복 방안" }
+  ];
+
   return (
     <Wrapper $darkMode={darkMode} collapsed={collapsed}>
       {/* 로고 */}
       <TopBar>
         <Logo onClick={() => setSelectedPage("aijob")}>
-          <LogoText collapsed={collapsed}>JOB자</LogoText>
+          <LogoText collapsed={collapsed}>JOB</LogoText>
+          <span style={{ color: "#fff" }}>자</span>
         </Logo>
       </TopBar>
 
@@ -34,10 +44,33 @@ export default function Sidebar({
           <FaRocket />
           <NavText collapsed={collapsed}><strong>AI 추천 공고</strong></NavText>
         </NavItem>
-        <NavItem onClick={() => setSelectedPage("career-roadmap")} $darkMode={darkMode}>
+
+        <NavItem
+          onClick={() => setCareerOpen(!careerOpen)}
+          $darkMode={darkMode}
+        >
           <FaBullseye />
-          <NavText collapsed={collapsed}><strong>커리어 로드맵</strong></NavText>
+          <NavText collapsed={collapsed}>
+            <strong>커리어 로드맵</strong>
+          </NavText>
+          {!collapsed && (
+            <ArrowIcon>{careerOpen ? <IoIosArrowDown /> : <IoIosArrowForward />}</ArrowIcon>
+          )}
         </NavItem>
+
+        {careerOpen && !collapsed && (
+          careerSubpages.map((sub) => (
+            <SubItem
+              key={sub.key}
+              onClick={() => setSelectedPage(sub.key)}
+              $darkMode={darkMode}
+            >
+              <Dot>•</Dot>
+              <strong>{sub.label}</strong>
+            </SubItem>
+          ))
+        )}
+
         <Divider $darkMode={darkMode} />
 
         <NavItem onClick={() => setSelectedPage("todo")} $darkMode={darkMode}>
@@ -52,6 +85,7 @@ export default function Sidebar({
           <FaHeart />
           <NavText collapsed={collapsed}><strong>찜한 공고</strong></NavText>
         </NavItem>
+
         <Divider $darkMode={darkMode} />
 
         <NavItem onClick={() => setSelectedPage("history")} $darkMode={darkMode}>
@@ -72,12 +106,12 @@ export default function Sidebar({
 
 /* ───────── 스타일 ───────── */
 const Wrapper = styled.aside`
-  width:${p=>p.collapsed?"56px":"260px"};
+  width:${p => p.collapsed ? "56px" : "260px"};
   display:flex; flex-direction:column; padding:1rem; transition:width .25s;
   ${({$darkMode})=>$darkMode?css`
     background:#333; color:#ccc;
   `:css`
-    background:#f7f4ec; color:#51442a; box-shadow:1px 0 4px rgba(0,0,0,.05);
+    background:rgb(206, 205, 204); color:#51442a; box-shadow:1px 0 4px rgba(0,0,0,.05);
   `}
 `;
 
@@ -89,7 +123,7 @@ const LogoText = styled.span`
 `;
 
 const NavSection = styled.div` flex:1; `;
-const NavText = styled.div` display:${p=>p.collapsed?"none":"flex"}; `;
+const NavText = styled.div` display:${p=>p.collapsed?"none":"flex"}; flex: 1; align-items: center; `;
 
 const NavItem = styled.div`
   display:flex; align-items:center; gap:.6rem; padding:.6rem; border-radius:.4rem;
@@ -97,8 +131,32 @@ const NavItem = styled.div`
   ${({$darkMode})=>$darkMode?css`
     &:hover{ background:#3a3a3a; svg{color:#ffc107;} ${NavText} strong{color:#ffc107;} }
   `:css`
-    &:hover{ background:#e8e2d6; svg{color:#d39b00;} ${NavText} strong{color:#d39b00;} }
+    &:hover{ background:rgb(248, 211, 99); 
+    svg{color:rgb(30, 30, 29);} ${NavText} strong{color:rgb(26, 25, 24);} }
   `}
+`;
+
+const ArrowIcon = styled.div`
+  margin-left: auto;
+  font-size: 1rem;
+`;
+
+const SubItem = styled.div`
+  display:flex; align-items:center; gap:0.4rem;
+  padding: 0.4rem 0.6rem 0.4rem 2.2rem;
+  margin-left: 0.2rem;
+  font-size: 0.95rem;
+  cursor:pointer; border-radius:0.4rem;
+  ${({$darkMode})=>$darkMode?css`
+    &:hover { background:#3a3a3a; strong{color:#ffc107;} }
+  `:css`
+    &:hover { background: #f0ebe3; strong{color: #d39b00;} }
+  `}
+`;
+
+const Dot = styled.span`
+  font-size: 1.2rem;
+  line-height: 1;
 `;
 
 const Divider = styled.div`
@@ -110,6 +168,7 @@ const Footer = styled.div`
   margin-top:auto;
   display:flex; justify-content:${p=>p.collapsed?"center":"flex-end"};
 `;
+
 const CollapseBtn = styled.div`
   font-size:1.2rem; cursor:pointer;
   ${({theme})=>css`color:${theme?.colors?.textSecondary||"#888"};`}

@@ -1,4 +1,3 @@
-// components/MainContent.jsx
 import React, { useState, useRef, useEffect } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { FaUserCircle, FaArrowLeft } from "react-icons/fa";
@@ -14,7 +13,6 @@ export default function MainContent({
   const [showProfile, setShowProfile] = useState(false);
   const profileRef = useRef(null);
 
-  /* ─ 페이지 정보 ─ */
   const pages = ["ai-jobs", "career-roadmap", "todo", "search", "saved", "history"];
   const pageTitle = {
     "ai-jobs": "AI 추천 공고",
@@ -33,9 +31,7 @@ export default function MainContent({
     history: "이전 대화 내용을 확인하세요.",
   };
 
-  /* ─ 대시보드 첫 화면 카드 ─ */
   function LandingCards({ setSelectedPage }) {
-    // 프론트 고정 데이터
     const preview = [
       { company: "네이버", match: 95, dday: 3 },
       { company: "카카오", match: 88, dday: 5 },
@@ -43,12 +39,10 @@ export default function MainContent({
       { company: "LG CNS", match: 77, dday: 2 },
       { company: "쿠팡", match: 72, dday: 7 },
     ];
-    
 
     return (
       <>
         <MainCards>
-          {/* AI 추천 공고 미리보기 */}
           <HoverCard
             $darkMode={darkMode}
             onClick={() => setSelectedPage("ai-jobs")}
@@ -63,9 +57,7 @@ export default function MainContent({
               <HighlightBar />
               <span>AI 추천 공고</span>
             </SectionTitle>
-
             <DescText>데이터 분석가에게 맞는 기업을 추천했어요.</DescText>
-
             <ColumnHeader>
               <ColumnTitle style={{ flex: 1.2, textAlign: "left" }}>기업명</ColumnTitle>
               <ColumnTitle style={{ flex: 0.8, textAlign: "left", paddingLeft: "2.2rem" }}>
@@ -73,8 +65,6 @@ export default function MainContent({
               </ColumnTitle>
               <ColumnTitle style={{ flex: 0.6, textAlign: "right" }}>적합도</ColumnTitle>
             </ColumnHeader>
-
-
             <PreviewList>
               {preview.map((p, idx) => (
                 <PreviewItem key={p.company}>
@@ -84,26 +74,66 @@ export default function MainContent({
                 </PreviewItem>
               ))}
             </PreviewList>
-
-
-
             <HintText>(클릭하면 상세 보기)</HintText>
           </HoverCard>
 
-
-
-
-
-          {/* 커리어 로드맵 기본 카드 */}
-          <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("career-roadmap")}>
-            커리어 로드맵
+          <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("todo")}>
+            To-do List
           </HoverCard>
         </MainCards>
 
         <SingleCard>
-          <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("todo")}>
-            To-do List
-          </HoverCard>
+        
+        <HoverCard
+  $darkMode={darkMode}
+  onClick={() => setSelectedPage("career-roadmap")}
+  style={{ flexDirection: "column", alignItems: "flex-start", padding: "2rem 1.5rem" }}
+>
+  <SectionTitle style={{ fontSize: "1.7rem" }}>
+    <HighlightBar />
+    <span>커리어 로드맵</span>
+  </SectionTitle>
+
+  <DescText>당신의 커리어 성장을 돕는 로드맵을 설계해보세요.</DescText>
+
+  <RoadmapPreview>
+    <RoadmapItem>
+      <Title>공고 분석</Title>
+      <BulletList>
+        <li>핵심 키워드 및 기술 요건 추출</li>
+        <li>우대 조건 및 직무 요약 제공</li>
+        <li>한눈에 공고 요약 파악</li>
+      </BulletList>
+    </RoadmapItem>
+
+    <Divider $darkMode={darkMode} />
+
+    <RoadmapItem>
+      <Title>갭 분석</Title>
+      <BulletList>
+        <li>내 이력서와 공고를 항목별 비교</li>
+        <li>부족 기술/경험 자동 분석</li>
+        <li>갭 점수 시각화 제공</li>
+      </BulletList>
+    </RoadmapItem>
+
+    <Divider $darkMode={darkMode} />
+
+    <RoadmapItem>
+      <Title>극복 방안</Title>
+      <BulletList>
+        <li>부족한 영역 학습 루트 제안</li>
+        <li>프로젝트/경험 추천</li>
+        <li>강의 및 부트캠프 연결</li>
+      </BulletList>
+    </RoadmapItem>
+  </RoadmapPreview>
+
+  <HintText>(클릭하면 상세 보기)</HintText>
+</HoverCard>
+
+
+
         </SingleCard>
 
         <SubCards>
@@ -118,7 +148,6 @@ export default function MainContent({
     );
   }
 
-  /* ─ AI 추천 공고 상세 (이전 버전 유지) ─ */
   function AiJobsCard({ $darkMode }) {
     const recommendations = [
       { company: "네이버", match: 95 },
@@ -148,7 +177,6 @@ export default function MainContent({
     );
   }
 
-  /* ─ 프로필 외부 클릭 감지 ─ */
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
@@ -161,7 +189,6 @@ export default function MainContent({
 
   return (
     <Main $darkMode={darkMode}>
-      {/* 헤더 + 스위치 + 프로필 */}
       <HeaderWrapper>
         <Header $darkMode={darkMode}>성재 님, 만나서 반갑습니다</Header>
         <ProfileMenu ref={profileRef}>
@@ -182,7 +209,6 @@ export default function MainContent({
         </ProfileMenu>
       </HeaderWrapper>
 
-      {/* 메인 내용 */}
       <ContentArea>
         <Scrollable>
           {selectedPage === LANDING_PAGE && <LandingCards setSelectedPage={setSelectedPage} />}
@@ -204,7 +230,6 @@ export default function MainContent({
         </Scrollable>
       </ContentArea>
 
-      {/* 하단 프롬프트 */}
       <PromptWrapper>
         <Prompt $darkMode={darkMode}>
           <PromptText>JOB자에게 메시지</PromptText>
@@ -216,6 +241,9 @@ export default function MainContent({
   );
 }
 
+
+
+/* 전체 스타일 컴포넌트는 기존과 동일하게 유지되었습니다. */
 /* ───────── 스타일 ───────── */
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -230,7 +258,7 @@ const Main = styled.main`
   ${({ $darkMode }) =>
     $darkMode
       ? css`background: #000; color: #fff;`
-      : css`background: rgb(235, 233, 224); color: #614f25;`}
+      : css`background: rgb(255, 255, 255); color: #614f25;`}
   min-height: 100vh;
   padding-bottom: 200px;
 `;
@@ -345,8 +373,8 @@ const HoverCard = styled(BaseCard)`
             color: #fffdd8;
           `
         : css`
-            background:rgb(249, 225, 147);
-            border: 1.5px solid rgb(239, 219, 152);
+            background:rgb(230, 226, 213);
+            border: 1.5px solid rgb(238, 186, 15);
             color: #3c2f12;
           `}
   }
@@ -392,11 +420,12 @@ const Prompt = styled.div`
   max-width: 800px;
   border-radius: 1rem;
   padding: 1rem;
-  ${({ $darkMode }) => ($darkMode ? "background:#333;" : "background:#ebe7dc;")}
+  ${({ $darkMode }) => ($darkMode ? "background:#333;" : 
+    "background:rgb(188, 185, 179);")}
 `;
 const PromptText = styled.div`
   font-size: 1rem;
-  color: #ffc107;
+  color:rgb(25, 19, 1);
 `;
 const PromptInput = styled.input`
   flex: 1;
@@ -446,10 +475,11 @@ const TitleText = styled.h3`
 `;
 
 const DescText = styled.p`
-  font-size: 0.83rem;
+  font-size: 0.9rem;
   color: #6c5f3f;
-  margin-bottom: 1.2rem;
+  margin: 0.5rem 0 4.2rem; /* 아래 마진을 기존보다 더 키움 */
 `;
+
 
 const ColumnTitle = styled.span`
   font-size: 1.05rem;
@@ -587,4 +617,57 @@ const ProgressBar = styled.div`
   height: 100%;
   width: ${({ $match }) => $match}%;
   background: #ffc107;
+`;
+
+
+/* 3-단 레이아웃 */
+const RoadmapPreview = styled.div`
+  display: flex;
+  justify-content: space-evenly; /* 변경: 간격을 균등하게 */
+  align-items: stretch;
+  gap: 0;
+  margin-top: 2rem;
+  width: 100%;
+`;
+
+const RoadmapItem = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  padding: 0 1rem;
+`;
+
+
+
+
+/* 설명 글씨 키움 */
+const SubText = styled.div`
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: #6c5f3f;
+`;
+
+const Title = styled.div`
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #3c2f12;
+`;
+
+const BulletList = styled.ul`
+  list-style-type: disc;
+  padding-left: 1.2rem;
+  font-size: 0.95rem;
+  color: #6c5f3f;
+  line-height: 1.6;
+  text-align: left;
+`;
+
+const Divider = styled.div`
+  width: 2px;
+  height: 200%; /* 세로선 더 길게 */
+  background: ${({ $darkMode }) => ($darkMode ? "#666" : "#c4b38a")};
+  opacity: 0.5;
+  align-self: center;
 `;
