@@ -4,7 +4,7 @@ import { FaArrowLeft } from "react-icons/fa";
 
 export default React.memo(function CareerRoadmapDetail({ section, darkMode, onBack }) {
   const titles = {
-    analysis: "공고 분석",
+    analysis: "트렌드 분석",
     gap: "갭 분석",
     plan: "극복 방안",
   };

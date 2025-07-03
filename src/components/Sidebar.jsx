@@ -17,7 +17,7 @@ export default function Sidebar({
 
   const careerSubpages = [
     { key: "career-summary", label: "종합" },
-    { key: "career-requirements", label: "공고 분석" },
+    { key: "career-requirements", label: "트렌드 분석" },
     { key: "career-gap", label: "갭 분석" },
     { key: "career-plan", label: "극복 방안" }
   ];

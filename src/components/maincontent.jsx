@@ -13,6 +13,11 @@ import ProfileMenu from "./ProfileMenu";
 import CareerRoadmapMain from "./CareerRoadmapMain";
 import CareerRoadmapDetail from "./CareerRoadmapDetail";
 
+import JobKeywordAnalysis from "./JobKeywordAnalysis";
+
+
+
+
 
 const LANDING_PAGE = "dashboard";
 
@@ -237,59 +242,64 @@ export default function MainContent({
         </MainCards>
 
         {/* 커리어 로드맵 카드 */}
-        <SingleCard>
-          <HoverCard
-            $darkMode={darkMode}
-            onClick={() => setSelectedPage("career-roadmap")}
-            style={{
-              flexDirection: "column",
-              alignItems: "flex-start",
-              padding: "2rem 1.5rem",
-            }}
-          >
-            <SectionTitle style={{ fontSize: "1.7rem" }}>
-              <HighlightBar />
-              <span>커리어 로드맵</span>
-            </SectionTitle>
+       {/* 커리어 로드맵 카드 */}
+<SingleCard>
+  <HoverCard
+    $darkMode={darkMode}
+    onClick={() => setSelectedPage("career-roadmap")}
+    style={{
+      flexDirection: "column",
+      alignItems: "flex-start",
+      padding: "2rem 1.5rem",
+    }}
+  >
+    <SectionTitle style={{ fontSize: "1.7rem" }}>
+      <HighlightBar />
+      <span>커리어 로드맵</span>
+    </SectionTitle>
 
-            <DescText>당신의 커리어 성장을 돕는 로드맵을 설계해보세요.</DescText>
+    <DescText>당신의 커리어 성장을 돕는 로드맵을 설계해보세요.</DescText>
 
-            <RoadmapPreview>
-              <RoadmapItem>
-                <Title>공고 분석</Title>
-                <BulletList>
-                  <li>핵심 키워드 및 기술 요건 추출</li>
-                  <li>우대 조건 및 직무 요약 제공</li>
-                  <li>한눈에 공고 요약 파악</li>
-                </BulletList>
-              </RoadmapItem>
+    <CardRow>
+  {[
+    {
+      id: "analysis",
+      label: "트렌드 분석",
+      desc: "",
+      color: "rgb(250, 243, 221)",
+    },
+    {
+      id: "gap",
+      label: "갭 분석",
+      desc: "내 이력서와 공고를 비교합니다.",
+      color: "rgb(251, 233, 179)",
+    },
+    {
+      id: "plan",
+      label: "극복 방안",
+      desc: "부족한 부분 학습 계획을 제안합니다.",
+      color: "rgb(242, 220, 155)",
+    },
+  ].map((s) => (
+    <MiniCard key={s.id} $bg={s.color} $darkMode={darkMode}>
+      <h3>{s.label}</h3>
+      <p>{s.desc}</p>
 
-              <Divider $darkMode={darkMode} />
+      {/* 트렌드 분석 카드 → 워드클라우드 */}
+      {s.id === "analysis" && (
+        <MiniWordCloudPreview>
+          <JobKeywordAnalysis />
+        </MiniWordCloudPreview>
+      )}
 
-              <RoadmapItem>
-                <Title>갭 분석</Title>
-                <BulletList>
-                  <li>내 이력서와 공고를 항목별 비교</li>
-                  <li>부족 기술/경험 자동 분석</li>
-                  <li>갭 점수 시각화 제공</li>
-                </BulletList>
-              </RoadmapItem>
+      <MiniHint>(클릭하면 상세 보기)</MiniHint>
+    </MiniCard>
+  ))}
+</CardRow>
 
-              <Divider $darkMode={darkMode} />
+  </HoverCard>
+</SingleCard>
 
-              <RoadmapItem>
-                <Title>극복 방안</Title>
-                <BulletList>
-                  <li>부족한 영역 학습 루트 제안</li>
-                  <li>프로젝트/경험 추천</li>
-                  <li>강의 및 부트캠프 연결</li>
-                </BulletList>
-              </RoadmapItem>
-            </RoadmapPreview>
-
-            <HintText>(클릭하면 상세 보기)</HintText>
-          </HoverCard>
-        </SingleCard>
 
         {/* 하단 2개 카드 */}
         <SubCards>
@@ -674,7 +684,8 @@ const BaseCard = styled.div`
 
 const HoverCard = styled(BaseCard)`
   flex: 1;
-  height: 480px;
+  height: auto;
+  min-height: 450px;
   font-size: 1.2rem;
   cursor: pointer;
   animation: ${fadeIn} 0.5s ease;
@@ -696,12 +707,7 @@ const HoverCard = styled(BaseCard)`
   }
 `;
 
-const Card = styled(BaseCard)`
-  height: 530px;
-  width: 850px;
-  cursor: default;
-  animation: ${fadeIn} 0.5s ease;
-`;
+
 
 const BackButton = styled.button`
   display: flex;
@@ -855,7 +861,7 @@ const HighlightBar = styled.div`
 const DescText = styled.p`
   font-size: 0.9rem;
   color: #6c5f3f;
-  margin: 0.3rem 0 3.7rem;
+  margin: 0.3rem 0 1rem;
 `;
 
 const ColumnTitle = styled.span`
@@ -924,7 +930,7 @@ const RoadmapPreview = styled.div`
   justify-content: space-evenly;
   align-items: stretch;
   gap: 0;
-  margin-top: 2rem;
+  margin-top: 1rem;
   width: 100%;
 `;
 const RoadmapItem = styled.div`
@@ -1123,58 +1129,12 @@ const RoadmapGrid = styled.div`
   }
 `;
 
-const FlowRow = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1.2rem;
-  flex-wrap: nowrap;
-`;
-
-const RoadmapCard = styled(BaseCard)`
-  width: 220px;
-  height: 250px;
-  background-color: ${({ $bg }) => $bg || "#f5f5f5"};
-  text-align: center;
-  padding: 1.5rem 1rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.6rem;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  h3 {
-    font-size: 1.3rem;
-    font-weight: bold;
-    margin-bottom: 0.4rem;
-  }
-
-  p {
-    font-size: 1rem;
-    line-height: 1.5;
-    font-weight: 500;
-  }
-
-  &:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-  }
-`;
-
-const ArrowBox = styled.div`
-  font-size: 2rem;
-  color: #888;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const SmallHint = styled.small`
-  font-size: 0.85rem;
-  opacity: 0.55;
-  margin-top: auto;
+const Card = styled.div`
+  width: 100%;
+  max-width: 1000px;
+  border-radius: 1.5rem;
+  padding: 3rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#eeeae2")};
 `;
 
 
@@ -1227,11 +1187,6 @@ const DetailList = styled.ul`
 `;
 
 
-
-
-
-
-
 const CalendarGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1279,3 +1234,138 @@ const NoTask = styled.li`
   font-size: 0.8rem;
   color: #777;
 `;
+
+
+const CardRow = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.8rem;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-top: 1rem;
+`;
+
+const MiniCard = styled.div`
+  width: 270px;
+  min-height: 400px;
+  background-color: ${({ $bg }) => $bg || " #f5f5f5"};
+  padding: 1.2rem 1rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  text-align: center;
+  font-weight: 500;
+
+  h3 {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  p {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  &:hover {
+    transform: scale(1.04);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const MiniHint = styled.small`
+  font-size: 0.8rem;
+  opacity: 0.55;
+  margin-top: auto;
+`;
+
+const MiniWordCloudPreview = styled.div`
+  width: 100%;
+  height: 180px;
+  margin-top: 1rem;
+
+  .react-wordcloud {
+    width: 100%;
+    height: 100%;
+  }
+
+  svg {
+    width: 100% !important;
+    height: 100% !important;
+  }
+`;
+
+
+
+
+const FlowRow = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2rem;
+  flex-wrap: nowrap;
+`;
+
+const RoadmapCard = styled.div`
+  width: 400px;
+  height: auto;
+  min-height: 450px;
+  background-color: ${({ $bg }) => $bg || "#f5f5f5"};
+  text-align: center;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.8rem;
+  cursor: pointer;
+  border-radius: 1rem;
+  font-weight: 500;
+  transition: transform 0.2s ease;
+
+  h3 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.4rem;
+  }
+
+  p {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    min-height: 50px;
+  }
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const WordPreview = styled.div`
+  margin-top: 1rem;
+  width: 100%;
+  height: 180px;
+`;
+
+const SmallHint = styled.small`
+  font-size: 0.9rem;
+  opacity: 0.55;
+  margin-top: auto;
+`;
+
+const ArrowBox = styled.div`
+  font-size: 2rem;
+  color: #aaa;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const MiniRadarPreview = styled.div`
+  width: 100%;
+  height: 180px;
+  margin-top: 1rem;
+`;
+
