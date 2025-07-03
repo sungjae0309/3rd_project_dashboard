@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 
-
+// --- 상수 (그대로) ---
 const DEGREE_OPTIONS = [
   { value: "", label: "선택" },
   { value: "고등학교", label: "고등학교" },
@@ -12,26 +12,21 @@ const DEGREE_OPTIONS = [
   { value: "대학원", label: "대학원" }
 ];
 
-const DEGREE_MAP = {
-  "고등학교": "고졸",
-  "대학교2": "학사",
-  "대학교4": "학사",
-  "대학원": "석사"
-};
+const DEGREE_MAP = { "고등학교": "고졸", "대학교2": "학사", "대학교4": "학사", "대학원": "석사" };
 
 const EDU_STATUS_OPTIONS = {
-  "고등학교": [{ value: "졸업", label: "졸업" }],
-  "대학교2": [
+  고등학교: [{ value: "졸업", label: "졸업" }],
+  대학교2: [
     { value: "재학", label: "재학" },
     { value: "휴학", label: "휴학" },
     { value: "졸업", label: "졸업" }
   ],
-  "대학교4": [
+  대학교4: [
     { value: "재학", label: "재학" },
     { value: "휴학", label: "휴학" },
     { value: "졸업", label: "졸업" }
   ],
-  "대학원": [
+  대학원: [
     { value: "재학", label: "재학" },
     { value: "휴학", label: "휴학" },
     { value: "졸업", label: "졸업" }
@@ -41,71 +36,38 @@ const EDU_STATUS_OPTIONS = {
 const JOB_OPTIONS = [
   "프론트엔드 개발자", "백엔드 개발자", "데이터 분석가", "AI 엔지니어",
   "UX/UI 디자이너", "PM/PO", "모바일 앱 개발자", "DevOps 엔지니어",
-  "게임 개발자", "보안 전문가", "QA 엔지니어"
+  "게임 개발자", "보안 전문가"
 ];
 
 const SKILL_CATEGORIES = [
-  {
-    title: "언어",
-    key: "언어",
-    options: ["C", "C++", "C#", "Java", "Python", "Ruby", "JavaScript"]
-  },
-  {
-    title: "프레임워크",
-    key: "프레임워크",
-    options: ["ReactJS", "Node.js", "TypeScript", "Vue.js", "jQuery", "Flutter"]
-  },
-  {
-    title: "협업툴",
-    key: "협업툴",
-    options: ["Git", "Slack", "Jira", "Notion", "Trello", "Figma"]
-  }
+  { title: "언어", key: "언어", options: ["C", "C++", "C#", "Java", "Python", "Ruby", "JavaScript"] },
+  { title: "프레임워크", key: "프레임워크", options: ["ReactJS", "Node.js", "TypeScript", "Vue.js", "jQuery", "Flutter"] },
+  { title: "협업툴", key: "협업툴", options: ["Git", "Slack", "Jira", "Notion", "Trello", "Figma"] }
 ];
 
 export default function ResumeEdit() {
+  // --- 상태 훅 (기존 그대로) ---
   const [resume, setResume] = useState({
     degree: "",
     university: "",
     major: "",
     gpa: "",
     education_status: "",
+    career_type: "",     // 👈 추가
+    career_years: "", 
     desired_job: "",
     language_score: "",
     skills: [],
     certificate_ids: []
   });
-
-  const [codingTest, setCodingTest] = useState({
-    platform: "",
-    score: ""
-  });
-  // 최종학력 UX 제어
-  const isHighSchoolGraduate =
-    resume.degree === "고등학교" && resume.education_status === "졸업";
-
-  // 수상/자격증/어학
+  const [codingTest, setCodingTest] = useState({ platform: "", score: "" });
+  const isHighSchoolGraduate = resume.degree === "고등학교" && resume.education_status === "졸업";
   const [certificates, setCertificates] = useState([{ type: "", value: "" }]);
-
-  // 관심직무
-  const [jobOpen, setJobOpen] = useState(true); // << default: 펼쳐짐!
+  const [jobOpen, setJobOpen] = useState(true);
   const [selectedJobs, setSelectedJobs] = useState([]);
-
-  // 기술스택
-  const [skills, setSkills] = useState({
-    언어: [],
-    프레임워크: [],
-    협업툴: []
-  });
-  const [skillLevels, setSkillLevels] = useState({
-    언어: {},
-    프레임워크: {},
-    협업툴: {}
-  });
-  const [isFolded, setIsFolded] = useState({
-    언어: false,
-    프레임워크: false,
-    협업툴: false
-  });
+  const [skills, setSkills] = useState({ 언어: [], 프레임워크: [], 협업툴: [] });
+  const [skillLevels, setSkillLevels] = useState({ 언어: {}, 프레임워크: {}, 협업툴: {} });
+  const [isFolded, setIsFolded] = useState({ 언어: false, 프레임워크: false, 협업툴: false });
 
   // 학력 select
   const handleDegreeChange = e => {
@@ -273,6 +235,44 @@ export default function ResumeEdit() {
                 ))}
               </Select>
             </FlexRow>
+
+            {/* ---- 경력 / 신입 선택 ---- */}
+            {["대학교2", "대학교4", "대학원"].includes(resume.degree) &&
+  resume.education_status === "졸업" && (
+    <FlexRow>
+      <Label>구분</Label>
+
+      <Select
+        name="career_type"
+        value={resume.career_type}
+        onChange={handleChange}
+        required
+        style={{ width: "140px" }}
+      >
+        <option value="">선택</option>
+        <option value="신입">신입</option>
+        <option value="경력">경력</option>
+      </Select>
+
+      {resume.career_type === "경력" && (
+        <>
+          
+          <Select
+            name="career_years"
+            value={resume.career_years}
+            onChange={handleChange}
+            required
+            style={{ width: "45%" }}
+          >
+            <option value="">년차 선택</option>
+            {Array.from({ length: 30 }, (_, i) => i + 1).map((y) => (
+              <option key={y} value={y}>{y}년차</option>
+            ))}
+          </Select>
+        </>
+      )}
+    </FlexRow>
+)}
             <FlexRow>
               <Label>학교명</Label>
               <Input
@@ -305,6 +305,9 @@ export default function ResumeEdit() {
                 placeholder="3.5"
               />
             </FlexRow>
+
+  
+
           </Section>
 
           {/* --- 수상/자격증/어학 --- */}
@@ -462,10 +465,9 @@ export default function ResumeEdit() {
 
 
 
-// ------ styled-components
 const Bg = styled.div`
   min-height: 100vh;
-  background: #1e1e1e;
+  background: #f5f5f5;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -473,14 +475,14 @@ const Bg = styled.div`
 `;
 
 const MainBox = styled.div`
-  background: rgb(80, 79, 79);
+  background: #ffffff;
   border-radius: 2rem;
-  box-shadow: 0 3px 18px 0 #0002;
+  box-shadow: 0 3px 18px 0 rgba(0,0,0,0.1);
   width: 35rem;
   max-width: 97vw;
   margin-bottom: 3rem;
   padding-bottom: 2.2rem;
-  color: #fff;
+  color: #333;
   position: relative;
 `;
 
@@ -488,7 +490,7 @@ const Header = styled.div`
   padding: 1.7rem 2.5rem 0.6rem 2.5rem;
   text-align: center;
   h1 {
-    color: #ffc107;
+    color: #ffa500;
     font-size: 2.2rem;
     font-weight: bold;
     margin-bottom: 0.4rem;
@@ -498,9 +500,88 @@ const Header = styled.div`
 
 const Divider = styled.hr`
   border: none;
-  border-top: 2px solid #f0f0f0;
+  border-top: 2px solid #e0e0e0;
   margin: 1.2rem auto 2.2rem auto;
   width: 87%;
+`;
+
+const SectionTitle = styled.h3`
+  font-size: 1.09rem;
+  margin-bottom: 1.35rem;
+  font-weight: 700;
+  color: #ffa500;
+`;
+
+const Label = styled.label`
+  min-width: 6rem;
+  font-size: 1.01rem;
+  font-weight: 500;
+  color: #555;
+`;
+
+const Select = styled.select`
+  min-width: 160px;
+  padding: 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-size: 1.13rem;
+  height: 48px;
+`;
+
+const Input = styled.input`
+  flex: 1;
+  padding: 0.85rem 1.1rem;
+  border-radius: 0.6rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-size: 1.13rem;
+  height: 48px;
+  &::placeholder { color: #aaa; }
+`;
+
+const DropdownCard = styled.div`
+  background: #ffffff;
+  border-radius: 1.1rem;
+  padding: 1rem 1.6rem 1.4rem 1.6rem;
+  box-shadow: 0 2px 8px #0000000d;
+  position: relative;
+`;
+
+const DropdownHeader = styled.div`
+  font-size: 1.05rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #ffa500;
+  cursor: pointer;
+  padding-bottom: 0.4rem;
+`;
+
+const DropdownItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: ${({ selected }) => (selected ? "#ffa50022" : "transparent")};
+  border-radius: 0.55rem;
+  font-weight: 500;
+  color: ${({ selected }) => (selected ? "#ffa500" : "#444")};
+  cursor: pointer;
+  padding: 0.4rem 1.2rem 0.4rem 0.5rem;
+  border: 1.5px solid ${({ selected }) => (selected ? "#ffa500" : "#dcdcdc")};
+  input { accent-color: #ffa500; }
+`;
+
+const Tag = styled.div`
+  background: #ffa500;
+  color: #fff;
+  border-radius: 1.2rem;
+  padding: 0.32rem 0.95rem;
+  font-size: 1rem;
+  cursor: pointer;
 `;
 
 const FormContainer = styled.form`
@@ -511,48 +592,11 @@ const Section = styled.section`
   margin-bottom: 2.1rem;
 `;
 
-const SectionTitle = styled.h3`
-  font-size: 1.09rem;
-  margin-bottom: 1.35rem;
-  font-weight: 700;
-  color: #ffc107;
-`;
-
 const FlexRow = styled.div`
   display: flex;
   align-items: center;
   margin-bottom: 1.1rem;
   gap: 1.5rem;
-`;
-
-const Label = styled.label`
-  min-width: 6rem;
-  font-size: 1.01rem;
-  font-weight: 500;
-  color: #fff;
-`;
-
-const Select = styled.select`
-  flex: 0 0 150px;
-  padding: 0.85rem;
-  border-radius: 0.6rem;
-  border: none;
-  background: #222;
-  color: #fff;
-  font-size: 1.13rem;
-  height: 48px;
-`;
-
-const Input = styled.input`
-  flex: 1;
-  padding: 0.85rem 1.1rem;
-  border-radius: 0.6rem;
-  border: none;
-  background: #222;
-  color: #fff;
-  font-size: 1.13rem;
-  height: 48px;
-  &::placeholder { color: #aaa; }
 `;
 
 const ExpRow = styled.div`
@@ -588,7 +632,7 @@ const RemoveBtn = styled.button`
 const AddBtn = styled.button`
   margin-bottom: 0.5rem;
   background: #f5f5f5;
-  color: rgb(79, 152, 230);
+  color: #ffa500;
   border: none;
   border-radius: 0.5rem;
   padding: 0.8rem 1.5rem;
@@ -596,53 +640,23 @@ const AddBtn = styled.button`
   cursor: pointer;
   font-size: 1rem;
   &:hover, &:focus {
-    background: rgb(79, 152, 230);
-    color: #f5f5f5;
+    background: #ffa500;
+    color: #fff;
   }
 `;
 
-// ---- 관심 직무, 기술스택 스타일 ----
-const DropdownCard = styled.div`
-  background: #232323;
-  border-radius: 1.1rem;
-  padding: 1rem 1.6rem 1.4rem 1.6rem;
-  box-shadow: 0 2px 8px #0001;
-  position: relative;
-`;
-const DropdownHeader = styled.div`
-  font-size: 1.05rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: #ffc107;
-  cursor: pointer;
-  padding-bottom: 0.4rem;
-`;
 const DropdownIcon = styled.span`
   font-size: 1.15rem;
   margin-left: 0.6rem;
   transition: 0.2s;
   transform: ${({ open }) => (open ? "rotate(-180deg)" : "none")};
 `;
+
 const DropdownBody = styled.div`
   margin: 0.5rem 0 0.7rem 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: 0.45rem;
-`;
-const DropdownItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: ${({ selected }) => (selected ? "#ffc10722" : "transparent")};
-  border-radius: 0.55rem;
-  font-weight: 500;
-  color: ${({ selected }) => (selected ? "#ffc107" : "#eee")};
-  cursor: pointer;
-  padding: 0.4rem 1.2rem 0.4rem 0.5rem;
-  border: 1.5px solid ${({ selected }) => (selected ? "#ffc107" : "#2c2c2c")};
-  input { accent-color: #ffc107; }
 `;
 
 const TagWrap = styled.div`
@@ -652,18 +666,6 @@ const TagWrap = styled.div`
   gap: 0.55rem;
 `;
 
-const Tag = styled.div`
-  background: #ffc107;
-  color: #1e1e1e;
-  border-radius: 1.2rem;
-  padding: 0.32rem 0.95rem 0.32rem 0.95rem;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.13s;
-  &:hover { background: #ffd955; }
-`;
-
 const SkillCardWrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -671,22 +673,36 @@ const SkillCardWrap = styled.div`
 `;
 
 const SkillCard = styled.div`
-  background: #222;
+  background: #f9f9f9;
   border-radius: 1rem;
   padding: 1.05rem 1.2rem 0.9rem 1.2rem;
   margin-bottom: 0.3rem;
-  box-shadow: 0 2px 9px 0 #0003;
+  box-shadow: 0 2px 9px 0 #ddd;
+`;
+
+const SkillHeader = styled.div`
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
+  cursor: pointer;
+  margin-bottom: 0.8rem;
 `;
 
 const SkillCatTitle = styled.div`
-  color: #ffc107;
+  color: #ffa500;
   font-size: 1.08rem;
   font-weight: bold;
-  margin-bottom: 0.7rem;
+`;
+
+const ToggleIcon = styled.span`
+  font-size: 1.4rem;
+  color: #ffa500;
+`;
+
+const Collapsible = styled.div`
+  max-height: ${({ open }) => (open ? "1000px" : "0")};
+  overflow: hidden;
+  transition: max-height 0.4s ease;
 `;
 
 const SkillGrid = styled.div`
@@ -699,15 +715,12 @@ const SkillGrid = styled.div`
 const SkillTag = styled.div`
   padding: 0.62rem 1.06rem;
   border-radius: 1.5rem;
-  background: ${({ selected }) => (selected ? "#ffc107" : "#444")};
-  color: ${({ selected }) => (selected ? "#232323" : "#fff")};
+  background: ${({ selected }) => (selected ? "#ffa500" : "#ccc")};
+  color: ${({ selected }) => (selected ? "#fff" : "#333")};
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  margin-bottom: 0.3rem;
   font-size: 1.01rem;
-  border: none;
-  transition: all 0.15s;
 `;
 
 const SkillLevelWrap = styled.div`
@@ -718,76 +731,37 @@ const SkillLevelWrap = styled.div`
   align-items: center;
   margin-bottom: 2.2rem;
 `;
+
 const SkillWithLevel = styled.div`
   display: flex;
   align-items: center;
   width: 80%;
   justify-content: flex-start;
-  margin-top: 0.9rem;
-  margin-bottom: 0.1rem;
 `;
+
 const LangTag = styled.div`
   min-width: 85px;
   text-align: center;
   font-size: 1.00rem;
   font-weight: bold;
-  color: #ffc107;
+  color: #ffa500;
   border-radius: 1.7rem;
   padding: 0.65rem 0;
   margin-right: 1.2rem;
 `;
-const LevelBtns = styled.div`
-  display: flex;
-  align-items: center;
-`;
-const LevelBtn = styled.button`
-  background: ${({ selected }) => (selected ? "#ffc107" : "#444")};
-  color: ${({ selected }) => (selected ? "#232323" : "#fff")};
-  border: none;
-  border-radius: 0.33rem;
-  min-width: 54px;
-  min-height: 40px;
-  font-size: 1.07rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.13s;
-  &:hover { background: #ffc107; color: #232323; }
-`;
+
 const SkillDoneBtn = styled.button`
   display: block;
   margin: 2rem auto 0;
   padding: 0.75rem 2rem;
   font-size: 1rem;
-  background: rgb(127, 125, 119);
+  background: #ffa500;
   color: white;
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
-  transition: background 0.3s;
-
   &:hover {
-    background: #ffc107; /* 호버 시 더 어두운 색 */
-    color: black;
-  }
-
-  &:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-  }
-`;
-const SkillEditBtnWrap = styled.div`
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  margin-top: 1.5rem;
-`;
-const SkillEditBtn = styled(SkillDoneBtn)`
-  background: #444;
-  color: #ffc107;
-  margin-left: 1rem;
-  &:hover {
-    background: #ffc107;
-    color: #232323;
+    background: #e69500;
   }
 `;
 
@@ -795,7 +769,7 @@ const SubmitBtn = styled.button`
   width: 100%;
   padding: 1.1rem;
   background: #ffc107;
-  color: #232323;
+  color: #000;
   border: none;
   border-radius: 0.7rem;
   font-size: 1.08rem;
@@ -803,32 +777,6 @@ const SubmitBtn = styled.button`
   margin-top: 2rem;
   cursor: pointer;
   &:hover {
-    background: #ffd955;
+    background: #ffca28;
   }
 `;
-
-const SkillHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  margin-bottom: 0.8rem;
-`;
-
-const ToggleIcon = styled.span`
-  font-size: 1.4rem;
-  color: #ffc107;
-`;
-
-const Collapsible = styled.div`
-  max-height: ${({ open }) => (open ? "1000px" : "0")};
-  overflow: hidden;
-  transition: max-height 0.4s ease;
-  will-change: max-height;
-`;
-
-
-
-
-
-export {};

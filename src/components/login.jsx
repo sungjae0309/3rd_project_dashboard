@@ -1,144 +1,229 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import styled from "styled-components";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import styled from "styled-components";
+import { FaUser, FaLock } from "react-icons/fa";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    username: "",
+    password: "",
+  });
 
-  // 입력값 변경 핸들러
-  const handleChange = e => {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://static.nid.naver.com/js/naveridlogin_js_sdk_2.0.2.js";
+    script.async = true;
+    script.onload = initNaver;
+    document.head.appendChild(script);
+  }, []);
+
+  const initNaver = () => {
+    if (!window.naver) return;
+    const naverLogin = new window.naver.LoginWithNaverId({
+      clientId: process.env.REACT_APP_NAVER_CLIENT_ID,
+      callbackUrl: `${window.location.origin}/navercallback`,
+      isPopup: false,
+      loginButton: { color: "green", type: 3, height: 48 },
+    });
+    naverLogin.init();
+  };
+
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  // 로그인 버튼 클릭
-  const handleLogin = async () => {
-    if (!form.email || !form.password) {
-      alert("이메일과 비밀번호를 입력해주세요.");
-      navigate("/registernext");
-      return;
-    }
-    setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const res = await axios.post("http://192.168.101.36:8000/auth/login", {
-        email: form.email,
-        password: form.password
-      });
-      // 토큰 저장 (localStorage 예시)
-      localStorage.setItem("accessToken", res.data.access_token);
+      await axios.post("/api/login", formData);
       alert("로그인 성공!");
-      
-      navigate("/"); // 대시보드로 이동
+      navigate("/dashboard");
     } catch (err) {
-      alert("로그인 실패: " + (err.response?.data?.detail || err.message));
+      console.error(err);
+      alert("로그인 실패");
     }
-    setLoading(false);
-  };
-
-  const goToSignup = () => {
-    navigate("/register");
   };
 
   return (
-    <LoginContainer>
-      <LoginBox>
-        <Title>로그인</Title>
-        <Input
-          type="text"
-          name="email"
-          placeholder="이메일 입력"
-          value={form.email}
-          onChange={handleChange}
-          autoComplete="email"
-        />
-        <Input
-          type="password"
-          name="password"
-          placeholder="비밀번호"
-          value={form.password}
-          onChange={handleChange}
-          autoComplete="current-password"
-          onKeyDown={e => { if (e.key === "Enter") handleLogin(); }}
-        />
-        <LoginButton onClick={handleLogin} disabled={loading}>
-          {loading ? "로딩 중..." : "완료"}
-        </LoginButton>
-        <SignupLink>
-          아직 계정이 없으신가요? <a onClick={goToSignup}>회원가입</a>
-        </SignupLink>
-      </LoginBox>
-    </LoginContainer>
+    <Bg>
+      <MainBox>
+        <Header>
+          <h1>로그인</h1>
+        </Header>
+
+        <FormContainer onSubmit={handleSubmit}>
+          <InputGroup>
+            <Icon><FaUser /></Icon>
+            <Input
+              name="username"
+              placeholder="아이디"
+              value={formData.username}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+          <InputGroup>
+            <Icon><FaLock /></Icon>
+            <Input
+              name="password"
+              type="password"
+              placeholder="비밀번호"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
+          <SubmitBtn type="submit">로그인</SubmitBtn>
+          <SignupText>
+  계정이 없으신가요? <a onClick={() => navigate("/register")}>회원가입</a>
+</SignupText>
+          <Divider />
+
+<SnsLoginArea>
+  <SNSButton id="naverIdLogin" />
+</SnsLoginArea>
+
+        </FormContainer>
+
+        <SnsLoginArea>
+          <SNSButton id="naverIdLogin" />
+        </SnsLoginArea>
+      </MainBox>
+    </Bg>
+
+    
   );
 }
 
-// ------ 스타일 (네 코드 그대로) ------
-const LoginContainer = styled.div`
-  background-color: #1c1c1c;
-  color: white;
-  height: 100vh;
+
+const Bg = styled.div`
+  min-height: 100vh;
+  background: #f4f4f4;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 3rem 1rem;
 `;
 
-const LoginBox = styled.div`
-  background-color: #2b2b2b;
-  padding: 3rem 4rem;
-  border-radius: 16px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+const MainBox = styled.div`
+  background: #ffffff;
+  border-radius: 1.8rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 420px;
+  padding: 2.5rem 2rem;
+  color: #333;
+`;
+
+const Header = styled.div`
   text-align: center;
+  margin-bottom: 2rem;
+  h1 {
+    color: #ff9e00;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
 `;
 
-const Title = styled.h1`
-  color: #ffc107;
-  margin-bottom: 2rem;
+const FormContainer = styled.form`
+  display: flex;
+  flex-direction: column;
+`;
+
+const InputGroup = styled.div`
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  transition: border 0.2s ease;
+
+  &:focus-within {
+    border-color: #ffcc00;
+  }
+`;
+
+const Icon = styled.div`
+  font-size: 1.2rem;
+  color: #777;
+  margin-right: 0.8rem;
 `;
 
 const Input = styled.input`
-  width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
+  flex: 1;
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  background-color: #3a3a3a;
-  color: white;
+  color: #333;
   font-size: 1rem;
-
+  &::placeholder {
+    color: #aaa;
+  }
   &:focus {
-    outline: 2px solid #ffc107;
+    outline: none;
   }
 `;
 
-const LoginButton = styled.button`
-  background-color: #ffc107;
-  color: #1c1c1c;
-  font-weight: bold;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+const SubmitBtn = styled.button`
   width: 100%;
+  padding: 1rem;
+  background: #ffc107;
+  color: #1a1a1a;
+  font-weight: bold;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 0.6rem;
   margin-top: 1rem;
+  cursor: pointer;
+  transition: background 0.25s ease;
 
   &:hover {
-    background-color: #e6b106;
-  }
-  &:disabled {
-    background: #999; cursor: not-allowed;
+    background: #ffd54f;
   }
 `;
 
-const SignupLink = styled.p`
-  color: #aaa;
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
+const Divider = styled.hr`
+  margin: 2rem 0 1.2rem;
+  border: none;
+  border-top: 1px solid #ccc;
+`;
+
+const SnsLoginArea = styled.div`
+  display: flex;
+  justify-content: center;
+`;
+
+const SNSButton = styled.div`
+  width: 100%;
+  max-width: 240px;
+  height: 48px;
+  background: transparent;
+  
+`;
+
+const SignupText = styled.div`
+  margin-top: 1.8rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #555;
 
   a {
-    color: #ffc107;
-    text-decoration: underline;
+    color: #0076ff;
+    font-weight: 600;
+    margin-left: 0.4rem;
     cursor: pointer;
+    text-decoration: underline;
+    &:hover {
+      color: #0055cc;
+    }
   }
 `;

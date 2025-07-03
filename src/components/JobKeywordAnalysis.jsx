@@ -1,12 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import styled from "styled-components";
 import WordCloud from "react-wordcloud";
 import "tippy.js/dist/tippy.css";
 import "tippy.js/animations/scale.css";
 
-
 export default function JobKeywordAnalysis() {
-  const words = [
+  const words = useMemo(() => [
     { text: "Python", value: 120 },
     { text: "SQL", value: 100 },
     { text: "머신러닝", value: 95 },
@@ -37,16 +36,16 @@ export default function JobKeywordAnalysis() {
     { text: "클러스터링", value: 20 },
     { text: "차원 축소", value: 18 },
     { text: "정규화", value: 16 },
-  ];
+  ], []);
 
-  const options = {
+  const options = useMemo(() => ({
     rotations: 0,
     fontSizes: [14, 50],
     fontFamily: "Pretendard, sans-serif",
-    enableTooltip: false, // 툴팁 비활성화
-    deterministic: true, // 항상 같은 결과
+    enableTooltip: false,
+    deterministic: true,
     colors: ["#264653", "#2a9d8f", "#e76f51", "#f4a261", "#e9c46a"],
-  };
+  }), []);
 
   return (
     <CloudContainer>

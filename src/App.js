@@ -7,13 +7,14 @@ import Login from "./components/login";
 import Aijob from "./components/aijob";
 import NaverCallback from "./components/navercallback";
 import GuestDashboard from "./components/guestdashboard";
-
+import ResumeSelect from "./components/ResumeSelect";
 
 export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<Register/>} />
+        <Route path="/resumeselect" element={<ResumeSelect/>} />
         <Route path="/registernext" element={<RegisterNext/>} />
         <Route path="/login" element={<Login/>} />
         <Route path="/logout" element={<Logout/>} />

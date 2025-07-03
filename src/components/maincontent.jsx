@@ -13,6 +13,7 @@ import ProfileMenu from "./ProfileMenu";
 import CareerRoadmapMain from "./CareerRoadmapMain";
 import CareerRoadmapDetail from "./CareerRoadmapDetail";
 
+
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
 
 
@@ -107,9 +108,9 @@ export default function MainContent({
   
     if (!query.trim()) return; // 빈 문자열 방지
   
-    if (isGuest && guestUses >= 20) {
+    if (isGuest && guestUses >= 50) {
       alert(
-        "게스트는 AI 추천 공고 기능을 20회까지 이용할 수 있습니다.\n회원가입 후 계속 이용해 주세요!"
+        "게스트는 AI 추천 공고 기능을 50회까지 이용할 수 있습니다.\n회원가입 후 계속 이용해 주세요!"
       );
       return;
     }
@@ -240,8 +241,7 @@ export default function MainContent({
             <HintText>(클릭하면 오늘의 할 일로 이동)</HintText>
           </HoverCard>
         </MainCards>
-
-        {/* 커리어 로드맵 카드 */}
+        
        {/* 커리어 로드맵 카드 */}
 <SingleCard>
   <HoverCard
@@ -278,22 +278,36 @@ export default function MainContent({
       id: "plan",
       label: "극복 방안",
       desc: "부족한 부분 학습 계획을 제안합니다.",
-      color: "rgb(242, 220, 155)",
+      color: "rgb(255, 220, 117)",
     },
   ].map((s) => (
-    <MiniCard key={s.id} $bg={s.color} $darkMode={darkMode}>
-      <h3>{s.label}</h3>
-      <p>{s.desc}</p>
+    <MiniCard
+  key={s.id}
+  $bg={s.color}
+  $darkMode={darkMode}
+>
+  <h3>{s.label}</h3>
+  <p>{s.desc}</p>
 
-      {/* 트렌드 분석 카드 → 워드클라우드 */}
-      {s.id === "analysis" && (
-        <MiniWordCloudPreview>
-          <JobKeywordAnalysis />
-        </MiniWordCloudPreview>
-      )}
+  {/* 트렌드 분석 카드만 워드클라우드 표시 */}
+  {s.id === "analysis" && (
+    <MiniWordCloudPreview>
+      <JobKeywordAnalysis />
+    </MiniWordCloudPreview>
+  )}
 
-      <MiniHint>(클릭하면 상세 보기)</MiniHint>
-    </MiniCard>
+  {/* 갭 분석 또는 극복 방안 카드면 빈 영역에 Blur 표시 */}
+  {(s.id === "gap" || s.id === "plan") && (
+  <BlurOverlay>
+    <BlurBox />
+    <LockIcon>🔒</LockIcon>
+  </BlurOverlay>
+)}
+
+
+  <MiniHint>(클릭하면 상세 보기)</MiniHint>
+</MiniCard>
+
   ))}
 </CardRow>
 
@@ -472,12 +486,14 @@ export default function MainContent({
     <Main $darkMode={darkMode}>
       {/* ─── 헤더 ─── */}
       <HeaderWrapper>
-        <Header $darkMode={darkMode}>김취준님, 
-          만나서 반갑습니다 
-        </Header>
-        <ProfileMenu darkMode={darkMode} toggleTheme={toggleTheme} />
+  <Header $darkMode={darkMode}>김취준님, 만나서 반갑습니다</Header>
 
-      </HeaderWrapper>
+
+  <ProfileMenu darkMode={darkMode} toggleTheme={toggleTheme} />
+</HeaderWrapper>
+
+
+
 
       {/* ─── 본문 ─── */}
       <ContentArea>
@@ -595,34 +611,18 @@ const ToggleWrapper = styled.div`
   align-items: center;
   gap: 1.2rem;
 `;
-const SwitchWrapper = styled.div`
-  width: 48px;
-  height: 28px;
-  border-radius: 14px;
-  cursor: pointer;
-  background: ${({ $darkMode }) => ($darkMode ? "#555" : "#ccc")};
-  position: relative;
-  transition: background 0.3s;
-`;
-const SwitchKnob = styled.div`
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: ${({ $darkMode }) => ($darkMode ? "#0f0" : "#fff")};
-  position: absolute;
-  top: 4px;
-  left: ${({ $darkMode }) => ($darkMode ? "24px" : "4px")};
-  transition: left 0.3s;
-`;
+
 
 const ProfileIcon = styled.div`
   font-size: 1.8rem;
-  color: #ccc;
   cursor: pointer;
+  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
+
   &:hover {
-    color: #fff;
+    color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#000")};
   }
 `;
+
 const Dropdown = styled.div`
   margin-top: 0.4rem;
   border-radius: 0.4rem;
@@ -1258,6 +1258,8 @@ const MiniCard = styled.div`
   gap: 0.6rem;
   text-align: center;
   font-weight: 500;
+  filter: ${({ $blurred }) => ($blurred ? "blur(2px)" : "none")};
+  pointer-events: ${({ $blurred }) => ($blurred ? "none" : "auto")};
 
   h3 {
     font-size: 1.2rem;
@@ -1369,3 +1371,60 @@ const MiniRadarPreview = styled.div`
   margin-top: 1rem;
 `;
 
+
+
+const BlurOverlay = styled.div`
+  position: relative;
+  width: 100%;
+  height: 220px;
+  margin-top: 1rem;
+`;
+
+const BlurBox = styled.div`
+  width: 100%;
+  height: 100%;
+  background: #f0e6cc;
+  filter: blur(4px);
+  border-radius: 0.6rem;
+`;
+
+const LockIcon = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: #333;
+  z-index: 2;
+  pointer-events: none;
+`;
+
+
+
+
+const ThemeToggle = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 1.2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 2px solid ${({ $darkMode }) => ($darkMode ? "#fff" : "#000")};
+  background: ${({ $darkMode }) => ($darkMode ? "#000" : "#fff")};
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#000")};
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+`;
+
+const ToggleIcon = styled.div`
+  background: #fff;
+  color: #000;
+  border-radius: 50%;
+  padding: 0.3rem;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;

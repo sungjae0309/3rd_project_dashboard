@@ -1,196 +1,279 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { FaUser, FaLock, FaMobileAlt, FaRegCalendarAlt } from "react-icons/fa";
+
 
 export default function Register() {
   const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    username: "",
+    password: "",
+    confirmPassword: "",
+    email: "",
+    birthdate: "",
+    phone: "",  
+  });
+  const [passwordMatch, setPasswordMatch] = useState(true);
 
-  /* 1) SDK 로드 & 버튼 초기화 */
+  // 네이버 SDK 로드
   useEffect(() => {
-    // SDK 스크립트 주입
     const script = document.createElement("script");
-    script.src =
-      "https://static.nid.naver.com/js/naveridlogin_js_sdk_2.0.2.js"; // 최신 2.0.2 SDK :contentReference[oaicite:0]{index=0}
+    script.src = "https://static.nid.naver.com/js/naveridlogin_js_sdk_2.0.2.js";
     script.async = true;
     script.onload = initNaver;
     document.head.appendChild(script);
   }, []);
 
-  /* 2) 네이버 버튼 생성 */
   const initNaver = () => {
     if (!window.naver) return;
-
     const naverLogin = new window.naver.LoginWithNaverId({
       clientId: process.env.REACT_APP_NAVER_CLIENT_ID,
       callbackUrl: `${window.location.origin}/navercallback`,
-      isPopup: false, // 팝업 대신 리다이렉트
-      loginButton: { color: "green", type: 3, height: 48 }, // 기본 버튼 커스터마이징
+      isPopup: false,
+      loginButton: { color: "green", type: 3, height: 48 },
     });
     naverLogin.init();
+  };
+
+  const handleChange = (e) => {
+    let { name, value } = e.target;
+  
+    if (name === "confirmPassword") {
+      setPasswordMatch(value === formData.password);
+    }
+    if (name === "password") {
+      setPasswordMatch(formData.confirmPassword === value);
+    }
+  
+    if (name === "phone") {
+      let numbers = value.replace(/\D/g, "");
+      if (numbers.length <= 3) {
+        value = numbers;
+      } else if (numbers.length <= 7) {
+        value = numbers.slice(0, 3) + "-" + numbers.slice(3);
+      } else {
+        value = numbers.slice(0, 3) + "-" + numbers.slice(3, 7) + "-" + numbers.slice(7, 11);
+      }
+    }
+  
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+  
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!passwordMatch) return;
+
+    try {
+      await axios.post("/api/register", formData);
+      alert("회원가입 완료!");
+      navigate("/login");
+    } catch (err) {
+      console.error(err);
+      alert("회원가입 실패");
+    }
   };
 
   return (
     <Bg>
       <MainBox>
         <Header>
-          <h1>네이버로 간편 가입</h1>
+          <h1>회원가입</h1>
         </Header>
 
-        {/* SDK가 이 div를 찾아서 버튼을 자동 렌더링 */}
-        <div id="naverIdLogin" style={{ textAlign: "center" }} />
+        <FormContainer onSubmit={handleSubmit}>
+          <InputGroup>
+            <Icon><FaUser /></Icon>
+            <Input
+              name="username"
+              placeholder="아이디"
+              value={formData.username}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+          <InputGroup>
+            <Icon><FaLock /></Icon>
+            <Input
+              name="password"
+              type="password"
+              placeholder="비밀번호"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+          <InputGroup>
+            <Icon><FaLock /></Icon>
+            <Input
+              name="confirmPassword"
+              type="password"
+              placeholder="비밀번호 확인"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+          {formData.confirmPassword && (
+            <PwInfo $match={passwordMatch}>
+              {passwordMatch ? "비밀번호가 일치합니다." : "비밀번호가 일치하지 않습니다."}
+            </PwInfo>
+          )}
+
+          <InputGroup>
+            <Icon><FaRegCalendarAlt /></Icon>
+            <Input
+              name="birthdate"
+              type="text"
+              placeholder="YYYYMMDD"
+              value={formData.birthdate}
+              maxLength={8}
+              pattern="\d{8}"
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Icon><FaMobileAlt /></Icon>
+            <Input
+              name="phone"
+              type="tel"
+              placeholder="010-0000-0000"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
+
+          <SubmitBtn type="submit">회원가입</SubmitBtn>
+        </FormContainer>
+
+        <Divider />
+
+        <SnsLoginArea>
+          <SNSButton id="naverIdLogin" />
+        </SnsLoginArea>
       </MainBox>
     </Bg>
   );
 }
 
-
-// ------ styled-components (네가 올린 거 그대로) ------
 const Bg = styled.div`
   min-height: 100vh;
-  background: #1e1e1e;
+  background: #f4f4f4;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: 2rem;
+  align-items: center;
+  padding: 3rem 1rem;
 `;
 
 const MainBox = styled.div`
-  background: rgb(80, 79, 79);
-  border-radius: 2rem;
-  box-shadow: 0 3px 18px 0 #0002;
-  width: 35rem;
-  max-width: 97vw;
-  margin-bottom: 3rem;
-  padding-bottom: 2.2rem;
-  color: #fff;
-  position: relative;
-`;
-
-const TopBar = styled.div`
+  background: #ffffff;
+  border-radius: 1.8rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
   width: 100%;
-  padding: 1.5rem 2.3rem 0 2.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const LogoArea = styled.div`
-  display: flex; align-items: center;
-`;
-
-const JobMark = styled.span`
-  font-size: 2.5rem;
-  font-weight: bold;
-  letter-spacing: -0.01em;
-  color: #ffc107;
+  max-width: 420px;
+  padding: 2.5rem 2rem;
+  color: #333;
 `;
 
 const Header = styled.div`
-  padding: 1.7rem 2.5rem 0.6rem 2.5rem;
   text-align: center;
+  margin-bottom: 2rem;
   h1 {
-    color: #ffc107;
-    font-size: 2.2rem;
-    font-weight: bold;
-    margin-bottom: 0.4rem;
+    color: #ff9e00;
+    font-size: 2rem;
+    font-weight: 700;
     letter-spacing: 0.03em;
   }
 `;
 
-const Divider = styled.hr`
-  border: none;
-  border-top: 2px solid #f0f0f0;
-  margin: 1.2rem auto 2.2rem auto;
-  width: 87%;
-`;
-
 const FormContainer = styled.form`
-  padding: 0 2.5rem;
+  display: flex;
+  flex-direction: column;
 `;
 
-const Section = styled.section`
-  margin-bottom: 2.1rem;
+const InputGroup = styled.div`
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  transition: border 0.2s ease;
+
+  &:focus-within {
+    border-color: #ffcc00;
+  }
 `;
 
-const Label = styled.label`
-  min-width: 6rem;
-  font-size: 1.01rem;
-  font-weight: 500;
-  color: #fff;
-  display: block;
-  margin-bottom: 0.5rem;
+const Icon = styled.div`
+  font-size: 1.2rem;
+  color: #777;
+  margin-right: 0.8rem;
 `;
 
 const Input = styled.input`
-  width: 100%;
-  padding: 0.85rem 1.1rem;
-  border-radius: 0.6rem;
+  flex: 1;
+  background: transparent;
   border: none;
-  background: #222;
-  color: #fff;
-  font-size: 1.13rem;
-  height: 48px;
-  &::placeholder { color: #aaa; }
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 0.85rem;
-  border-radius: 0.6rem;
-  border: none;
-  background: #222;
-  color: #fff;
-  font-size: 1.13rem;
-  height: 48px;
-`;
-
-const PwInfo = styled.div`
-  font-size: 0.96rem;
-  margin: 0.5rem 0 0 0;
-  color: ${({ $match }) => $match ? "#7bed7b" : "#e55b5b"};
-  font-weight: 500;
+  color: #333;
+  font-size: 1rem;
+  &::placeholder {
+    color: #aaa;
+  }
+  &:focus {
+    outline: none;
+  }
 `;
 
 const SubmitBtn = styled.button`
   width: 100%;
-  padding: 1.1rem;
+  padding: 1rem;
   background: #ffc107;
-  color: #232323;
-  border: none;
-  border-radius: 0.7rem;
-  font-size: 1.08rem;
+  color: #1a1a1a;
   font-weight: bold;
-  margin-top: 2rem;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 0.6rem;
+  margin-top: 1rem;
   cursor: pointer;
+  transition: background 0.25s ease;
+
   &:hover {
-    background: #ffd955;
+    background: #ffd54f;
   }
 `;
 
-const EmailDropdownArea = styled.div`
-  position: absolute;
-  top: 3.1rem;
-  left: 0;
-  width: 100%;
-  z-index: 15;
-  background: #232323;
-  border: none;
-  border-radius: 0.55rem;
-  box-shadow: 0 4px 16px 0 #0008;
-  padding: 0.35rem 0.4rem;
-  font-size: 1.07rem;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 0.22rem;
+const PwInfo = styled.div`
+  font-size: 0.9rem;
+  color: ${({ $match }) => ($match ? "#33b96f" : "#f26a6a")};
+  margin-bottom: 1rem;
 `;
 
-const EmailDropdownItem = styled.div`
-  padding: 0.7rem 1rem 0.7rem 1.3rem;
-  color: #fff;
-  background: transparent;
-  border-radius: 0.35rem;
-  cursor: pointer;
-  &:hover { background: #222; }
+const Divider = styled.hr`
+  margin: 2rem 0 1.2rem;
+  border: none;
+  border-top: 1px solid #ccc;
 `;
+
+const SnsLoginArea = styled.div`
+  display: flex;
+  justify-content: center;
+`;
+
+const SNSButton = styled.div`
+  width: 100%;
+  max-width: 240px;
+  height: 48px;
+  background: transparent;
+`;
+
