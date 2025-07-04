@@ -189,7 +189,31 @@ export default function ResumeEdit() {
       } catch (err) {
         alert("저장 실패: " + (err.response?.data?.detail || err.message));
       }
-    }
+
+      try {
+        const { data } = await axios.put(
+          "http://192.168.101.36:8000/resume/me",
+          payload,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+    
+        // 1️⃣ localStorage 캐시
+        localStorage.setItem("resumeData", JSON.stringify(data));
+    
+        // 2️⃣ 알림
+        alert("✅ 저장 완료!");
+    
+        // 3️⃣ 프로필 페이지로 이동 (Single-Page 앱 구조에 맞춰 선택)
+        //   a) 라우터 사용 시
+        // navigate("/profile");
+        //   b) MainContent 상태 사용 시
+        // setSelectedPage("profile");
+        //   c) 간단히 전체 새로고침
+        // window.location.href = "/profile";
+      } catch (err) {
+        alert("저장 실패: " + (err.response?.data?.detail || err.message));
+      }
+    };
 
 
   // placeholder
@@ -207,7 +231,7 @@ export default function ResumeEdit() {
     <Bg>
       <MainBox>
         <Header>
-          <h1>이력서 정보 입력</h1>
+          <h1>내 프로필</h1>
         </Header>
         <Divider />
         <FormContainer onSubmit={handleSubmit} autoComplete="off">

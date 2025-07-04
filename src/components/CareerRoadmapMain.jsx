@@ -4,8 +4,11 @@ import styled, { keyframes } from "styled-components";
 import WordCloud from "react-wordcloud";
 import { IoIosArrowUp } from "react-icons/io";
 import QuickQuiz from "./QuickQuiz";
+import { useNavigate } from "react-router-dom";
 
-export default function CareerRoadmapMain({ darkMode = false }) {
+export default function CareerRoadmapMain({ darkMode = false }) { 
+  const navigate = useNavigate();
+
   const keywords = [
     { text: "Python", value: 80 },
     { text: "SQL", value: 60 },
@@ -23,7 +26,7 @@ export default function CareerRoadmapMain({ darkMode = false }) {
   return (
     <Container $darkMode={darkMode}>
       {/* ───────────── 직무 트렌드 분석 ───────────── */}
-      <SectionCard $first>
+      <SectionCard $first onClick={() => navigate("/career-summary/trend")}>
         <LeftSide>
           <TopTextBlock>
             <Title>직무 트렌드 분석</Title>
@@ -38,13 +41,11 @@ export default function CareerRoadmapMain({ darkMode = false }) {
           </BottomWordCloud>
         </LeftSide>
 
-        {/* 우측 영역: QuickQuiz 삽입 */}
         <QuizWrapper>
           <QuickQuiz type="trend" />
         </QuizWrapper>
       </SectionCard>
 
-      {/* ▼▼▼ 스크롤 힌트 */}
       <ScrollArrow>
         <IoIosArrowUp />
         <IoIosArrowUp />
@@ -52,7 +53,7 @@ export default function CareerRoadmapMain({ darkMode = false }) {
       </ScrollArrow>
 
       {/* ───────────── 갭 분석 ───────────── */}
-      <SectionCard>
+      <SectionCard onClick={() => navigate("/career-summary/gap")}>
         <LeftSide>
           <TopTextBlock>
             <Title>갭 분석</Title>
@@ -63,13 +64,11 @@ export default function CareerRoadmapMain({ darkMode = false }) {
           </TopTextBlock>
         </LeftSide>
 
-        {/* 우측 영역: QuickQuiz for Gap */}
         <QuizWrapper>
           <QuickQuiz type="gap" />
         </QuizWrapper>
       </SectionCard>
 
-      {/* ▼▼▼ 스크롤 힌트 */}
       <ScrollArrow>
         <IoIosArrowUp />
         <IoIosArrowUp />
@@ -77,7 +76,7 @@ export default function CareerRoadmapMain({ darkMode = false }) {
       </ScrollArrow>
 
       {/* ───────────── 극복 방안 ───────────── */}
-      <SectionCard>
+      <SectionCard onClick={() => navigate("/career-summary/overcome")}>
         <RightOnly>
           <Title>극복 방안</Title>
           <Text>
@@ -110,6 +109,11 @@ const SectionCard = styled.div`
   padding: 1.6rem 2.2rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   min-height: 53vh;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
 `;
 
 const LeftSide = styled.div`
