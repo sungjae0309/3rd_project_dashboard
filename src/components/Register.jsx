@@ -1,3 +1,4 @@
+/* ────────────── src/pages/Register.jsx ────────────── */
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import axios from "axios";
@@ -14,21 +15,21 @@ import {
 export default function Register() {
   const navigate = useNavigate();
 
-  /* ───────── form ───────── */
+  /* ── 폼 상태 ─────────────────────────────── */
   const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    confirmPassword: "",
     email: "",
-    birthdate: "",
-    phone: "",
+    password: "",
+    confirm_password: "",
     nickname: "",
-    fullname: "",
-    gender: "", // "male" | "female"
+    name: "",
+    phone_number: "",
+    birth_date: "",
+    gender: "",
   });
+
   const [passwordMatch, setPasswordMatch] = useState(true);
 
-  /* ───────── NAVER SDK ───────── */
+  /* ── 네이버 SDK 로드 ─────────────────────── */
   useEffect(() => {
     const script = document.createElement("script");
     script.src =
@@ -37,70 +38,135 @@ export default function Register() {
     script.onload = initNaver;
     document.head.appendChild(script);
   }, []);
+
   const initNaver = () => {
     if (!window.naver) return;
     const naverLogin = new window.naver.LoginWithNaverId({
       clientId: process.env.REACT_APP_NAVER_CLIENT_ID,
-      callbackUrl: `${window.location.origin}/navercallback`,
-      isPopup: false,
+      callbackUrl: `${window.location.origin}/naver-callback`,
+      isPopup: true,
       loginButton: { color: "green", type: 3, height: 48 },
     });
     naverLogin.init();
   };
 
-  /* ───────── input handler ───────── */
+  /* ── 네이버 콜백 처리 (기존 로직 유지) ───── */
+  useEffect(() => {
+    const listener = async () => {
+      const hash = new URLSearchParams(window.location.hash.replace("#", ""));
+      const naverToken = hash.get("access_token");
+      if (!naverToken) return;
+      try {
+        const { data } = await axios.post(
+          "http://192.168.101.51:8000/auth/login/naver",
+          { access_token: naverToken }
+        );
+        localStorage.setItem("accessToken", data.access_token);
+        alert("네이버 로그인 완료!");
+        navigate("/dashboard");
+      } catch {
+        alert("네이버 로그인 실패");
+      }
+    };
+    window.addEventListener("load", listener);
+    return () => window.removeEventListener("load", listener);
+  }, [navigate]);
+
+  /* ── 입력 핸들러 ─────────────────────────── */
   const handleChange = (e) => {
     let { name, value } = e.target;
 
-    if (name === "confirmPassword") {
+    /* 비밀번호 일치 검사 */
+    if (name === "confirm_password")
       setPasswordMatch(value === formData.password);
-    }
-    if (name === "password") {
-      setPasswordMatch(formData.confirmPassword === value);
+    if (name === "password")
+      setPasswordMatch(formData.confirm_password === value);
+
+    /* 전화번호 하이픈 자동 삽입 */
+    if (name === "phone_number") {
+      const digits = value.replace(/\D/g, "");
+      if (digits.length <= 3) value = digits;
+      else if (digits.length <= 7)
+        value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+      else
+        value = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(
+          7,
+          11
+        )}`;
     }
 
-    // 자동 하이픈 전화번호
-    if (name === "phone") {
-      const numbers = value.replace(/\D/g, "");
-      if (numbers.length <= 3) value = numbers;
-      else if (numbers.length <= 7)
-        value = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-      else
-        value = `${numbers.slice(0, 3)}-${numbers.slice(
-          3,
-          7
-        )}-${numbers.slice(7, 11)}`;
+    /* 생년월일 YYYY-MM-DD 포맷팅 */
+    if (name === "birth_date") {
+      const d = value.replace(/\D/g, "");
+      if (d.length <= 4) value = d;
+      else if (d.length <= 6) value = `${d.slice(0, 4)}-${d.slice(4)}`;
+      else value = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  /* ───────── submit ───────── */
+  /* ── 프론트 유효성 검사 ───────────────────── */
+  const validateForm = () => {
+    const phoneDigits = formData.phone_number.replace(/-/g, "");
+    if (phoneDigits.length !== 11)
+      return "휴대폰 번호는 숫자 11자리여야 합니다";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birth_date))
+      return "생년월일 형식이 올바르지 않습니다 (YYYY-MM-DD)";
+    if (!passwordMatch) return "비밀번호가 일치하지 않습니다";
+    return null;
+  };
+
+  /* ── 제출: 회원가입 → 자동 로그인 → 이동 ─── */
+  /* ── 제출: 회원가입 → 자동 로그인 → 이동 ─── */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!passwordMatch) return;
+    const err = validateForm();
+    if (err) return alert(err);
 
     try {
-      await axios.post("/api/register", formData);
-      alert("회원가입 완료!");
-      // 프로필 기본값 저장
-      const basicProfile = {
-        name: formData.fullname,
-        nickname: formData.nickname,
-        email: formData.email,
-        phone: formData.phone,
-        gender: formData.gender,
-        bio: "안녕하세요! 더 나은 개발자가 되기 위해 노력 중입니다.",
-      };
-      localStorage.setItem("myProfile", JSON.stringify(basicProfile));
-      navigate("/login");
+      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+      // 1) 회원가입
+      await axios.post(`${BASE_URL}/users/signup/id`, {
+        ...formData,
+        phone_number: formData.phone_number.replace(/-/g, ""),
+      });
+
+      // 2) 바로 로그인 (토큰 발급)
+      const payload = new URLSearchParams();
+      payload.append("username", formData.email);
+      payload.append("password", formData.password);
+
+      const { data: tokenRes } = await axios.post(
+        `${BASE_URL}/token`,
+        payload,
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+      
+      const token = tokenRes.access_token;
+      
+      // ✨ 3) 토큰을 사용하여 사용자 정보(ID 포함) 가져오기 (수정된 부분)
+      const { data: userRes } = await axios.get(
+        `${BASE_URL}/users/me`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // ✨ 4) 토큰과 userId 모두 저장 (수정된 부분)
+      localStorage.setItem("accessToken", token);
+      localStorage.setItem("userId", userRes.id);
+      localStorage.removeItem("chatSessionId"); // 혹시 모를 채팅 세션 초기화
+
+      alert("회원가입 및 자동 로그인 완료!");
+
+      // 5) 이력서 선택 페이지로 이동
+      navigate("/resumeselect"); // Registernext 대신 이력서 선택 페이지로 이동
     } catch (err) {
-      console.error(err);
-      alert("회원가입 실패");
+      console.error(err.response?.data || err);
+      alert("회원가입 실패: " + (err.response?.data?.detail || err.message));
     }
   };
 
-  /* ───────── view ───────── */
+  /* ── JSX 렌더링 ───────────────────────────── */
   return (
     <Bg>
       <MainBox>
@@ -108,80 +174,20 @@ export default function Register() {
           <h1>회원가입</h1>
         </Header>
 
-        {/* 이름 */}
-        <InputGroup>
-            <Icon>
-              <FaIdBadge />
-            </Icon>
-            <Input
-              name="fullname"
-              placeholder="이름"
-              value={formData.fullname}
-              onChange={handleChange}
-              required
-            />
-          </InputGroup>
-
-          {/* 닉네임 */}
-          <InputGroup>
-            <Icon>
-              <FaUser />
-            </Icon>
-            <Input
-              name="nickname"
-              placeholder="닉네임"
-              value={formData.nickname}
-              onChange={handleChange}
-              required
-            />
-          </InputGroup>
-
-          {/* 성별 */}
-          <InputGroup style={{ justifyContent: "flex-start" }}>
-            <Icon>
-              <FaVenusMars />
-            </Icon>
-            <RadioWrap>
-              <label>
-                <input
-                  type="radio"
-                  name="gender"
-                  value="male"
-                  checked={formData.gender === "male"}
-                  onChange={handleChange}
-                  required
-                />
-                <span>남</span>
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="gender"
-                  value="female"
-                  checked={formData.gender === "female"}
-                  onChange={handleChange}
-                />
-                <span>여</span>
-              </label>
-            </RadioWrap>
-          </InputGroup>
-
         <FormContainer onSubmit={handleSubmit}>
-          {/* 아이디 */}
           <InputGroup>
             <Icon>
               <FaUser />
             </Icon>
             <Input
-              name="username"
-              placeholder="아이디"
-              value={formData.username}
+              name="email"
+              placeholder="아이디 또는 이메일"
+              value={formData.email}
               onChange={handleChange}
               required
             />
           </InputGroup>
 
-          {/* 비밀번호 */}
           <InputGroup>
             <Icon>
               <FaLock />
@@ -196,21 +202,21 @@ export default function Register() {
             />
           </InputGroup>
 
-          {/* 비밀번호 확인 */}
           <InputGroup>
             <Icon>
               <FaLock />
             </Icon>
             <Input
-              name="confirmPassword"
+              name="confirm_password"
               type="password"
               placeholder="비밀번호 확인"
-              value={formData.confirmPassword}
+              value={formData.confirm_password}
               onChange={handleChange}
               required
             />
           </InputGroup>
-          {formData.confirmPassword && (
+
+          {formData.confirm_password && (
             <PwInfo $match={passwordMatch}>
               {passwordMatch
                 ? "비밀번호가 일치합니다."
@@ -218,33 +224,68 @@ export default function Register() {
             </PwInfo>
           )}
 
-          {/* 생년월일 */}
           <InputGroup>
             <Icon>
-              <FaRegCalendarAlt />
+              <FaIdBadge />
             </Icon>
             <Input
-              name="birthdate"
-              type="text"
-              placeholder="YYYYMMDD"
-              value={formData.birthdate}
-              maxLength={8}
-              pattern="\d{8}"
+              name="name"
+              placeholder="이름"
+              value={formData.name}
               onChange={handleChange}
               required
             />
           </InputGroup>
 
-          {/* 전화번호 */}
+          <InputGroup>
+            <Icon>
+              <FaUser />
+            </Icon>
+            <Input
+              name="nickname"
+              placeholder="닉네임"
+              value={formData.nickname}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Icon>
+              <FaVenusMars />
+            </Icon>
+            <Input
+              name="gender"
+              placeholder="성별 입력 (예: 남자/여자)"
+              value={formData.gender}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Icon>
+              <FaRegCalendarAlt />
+            </Icon>
+            <Input
+              name="birth_date"
+              placeholder="YYYY-MM-DD"
+              value={formData.birth_date}
+              maxLength={10}
+              pattern="\d{4}-\d{2}-\d{2}"
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+
           <InputGroup>
             <Icon>
               <FaMobileAlt />
             </Icon>
             <Input
-              name="phone"
-              type="tel"
+              name="phone_number"
               placeholder="010-0000-0000"
-              value={formData.phone}
+              value={formData.phone_number}
               onChange={handleChange}
               required
             />
@@ -254,16 +295,17 @@ export default function Register() {
         </FormContainer>
 
         <Divider />
-
-        <SnsLoginArea>
-          <SNSButton id="naverIdLogin" />
-        </SnsLoginArea>
+        <NaverArea>
+          <div id="naverIdLogin" />
+        </NaverArea>
       </MainBox>
     </Bg>
   );
 }
 
-/* ───── styled ───── */
+/* ───────────────────────────────────────────
+ * 🎨 styled-components (변경 없음)
+ * ─────────────────────────────────────────── */
 const Bg = styled.div`
   min-height: 100vh;
   background: #f4f4f4;
@@ -272,9 +314,8 @@ const Bg = styled.div`
   align-items: flex-start;
   padding: 0.1rem 1rem 3rem;
 `;
-
 const MainBox = styled.div`
-  background: #ffffff;
+  background: #fff;
   border-radius: 1.8rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   width: 100%;
@@ -282,7 +323,6 @@ const MainBox = styled.div`
   padding: 2.5rem 2rem;
   color: #333;
 `;
-
 const Header = styled.div`
   text-align: center;
   margin-bottom: 2rem;
@@ -290,15 +330,12 @@ const Header = styled.div`
     color: #ff9e00;
     font-size: 2rem;
     font-weight: 700;
-    letter-spacing: 0.03em;
   }
 `;
-
 const FormContainer = styled.form`
   display: flex;
   flex-direction: column;
 `;
-
 const InputGroup = styled.div`
   display: flex;
   align-items: center;
@@ -312,18 +349,15 @@ const InputGroup = styled.div`
     border-color: #ffcc00;
   }
 `;
-
 const Icon = styled.div`
   font-size: 1.2rem;
   color: #777;
   margin-right: 0.8rem;
 `;
-
 const Input = styled.input`
   flex: 1;
   background: transparent;
   border: none;
-  color: #333;
   font-size: 1rem;
   &::placeholder {
     color: #aaa;
@@ -332,58 +366,31 @@ const Input = styled.input`
     outline: none;
   }
 `;
-
-const RadioWrap = styled.div`
-  display: flex;
-  gap: 1.2rem;
-  label {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.95rem;
-    input {
-      accent-color: #ffc107;
-      transform: translateY(1px);
-    }
-  }
-`;
-
 const SubmitBtn = styled.button`
   width: 100%;
   padding: 1rem;
+  margin-top: 1rem;
   background: #ffc107;
-  color: #1a1a1a;
-  font-weight: bold;
-  font-size: 1.1rem;
   border: none;
   border-radius: 0.6rem;
-  margin-top: 1rem;
+  font-size: 1.1rem;
+  font-weight: bold;
   cursor: pointer;
-  transition: background 0.25s ease;
   &:hover {
     background: #ffd54f;
   }
 `;
-
 const PwInfo = styled.div`
   font-size: 0.9rem;
-  color: ${({ $match }) => ($match ? "#33b96f" : "#f26a6a")};
   margin-bottom: 1rem;
+  color: ${({ $match }) => ($match ? "#33b96f" : "#f26a6a")};
 `;
-
 const Divider = styled.hr`
   margin: 2rem 0 1.2rem;
   border: none;
   border-top: 1px solid #ccc;
 `;
-
-const SnsLoginArea = styled.div`
+const NaverArea = styled.div`
   display: flex;
   justify-content: center;
-`;
-
-const SNSButton = styled.div`
-  width: 100%;
-  max-width: 240px;
-  height: 48px;
 `;

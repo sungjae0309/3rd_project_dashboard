@@ -1,110 +1,271 @@
-// ─────── JobCardPreview.jsx ───────
-import React from "react";
-import styled, { css } from "styled-components";
-import { FiSearch, FiHeart } from "react-icons/fi";
+// src/components/JobCardPreview.jsx
+import React, { useEffect, useState } from "react";
+import styled from "styled-components";
+import axios from "axios";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
+import JobCardFiltered from "./JobCardFiltered";
 
-export default function JobCardPreview({ setSelectedPage, darkMode }) {
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+export default function JobCardPreview({ darkMode, savedJobs, setSavedJobs, onJobDetail }) {
+  const [jobPosts, setJobPosts] = useState([]);
+  const [filters, setFilters] = useState({
+    company_name: "",
+    employment_type: "",
+    applicant_type: "",
+    tech_stack: "",
+    job_name: "",
+  });
+
+  const [searchInput, setSearchInput] = useState("");
+
+  useEffect(() => {
+    fetchJobs();
+  }, [filters]);
+
+  useEffect(() => {
+    fetchSavedJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    try {
+      // ✨ 1. 유사도 점수를 받기 위해 로그인 토큰을 함께 보냅니다.
+      const token = localStorage.getItem("accessToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const res = await axios.get(`${BASE_URL}/job_posts/`, {
+        params: filters,
+        headers: headers, // 헤더에 토큰 추가
+      });
+
+      if (!Array.isArray(res.data)) {
+        console.error("공고 API 응답이 배열이 아님:", res.data);
+        setJobPosts([]);
+        return;
+      }
+
+      // ✨ 2. API로부터 받은 공고 목록을 유사도(similarity) 점수가 높은 순으로 정렬합니다.
+      const sortedData = res.data.sort((a, b) => {
+        const simA = a.similarity ?? -1;
+        const simB = b.similarity ?? -1;
+        return simB - simA;
+      });
+
+      setJobPosts(sortedData);
+    } catch (err) {
+      console.error("❌ 공고 불러오기 실패:", err);
+      setJobPosts([]);
+    }
+  };
+
+  const fetchSavedJobs = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    try {
+      const res = await axios.get(`${BASE_URL}/preferences/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const jobs = res.data.map((item) => ({
+        ...item.job_posting,
+        job_post_id: item.job_post_id,
+        preference_id: item.id,
+      }));
+      setSavedJobs(jobs);
+    } catch (err) {
+      console.error("찜한 공고 불러오기 실패", err);
+    }
+  };
+
+  const handleToggleSave = async (jobPostId) => {
+    // ✨ 1. 디버깅을 위해 현재 토큰 값을 콘솔에 출력합니다.
+    const token = localStorage.getItem("accessToken");
+    console.log("찜하기 버튼 클릭 시 토큰:", token);
+
+    if (!token) {
+      alert("로그인 후 이용해주세요.");
+      return;
+    }
+
+    const isSaved = savedJobs.some((job) => job.job_post_id === jobPostId);
+
+    if (isSaved) {
+      try {
+        await axios.delete(`${BASE_URL}/preferences/${jobPostId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setSavedJobs((prev) => prev.filter((job) => job.job_post_id !== jobPostId));
+      } catch (err) {
+        alert("찜 해제 실패");
+      }
+    } else {
+      try {
+        const res = await axios.post(
+          `${BASE_URL}/preferences/`,
+          { job_post_id: jobPostId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const newJob = {
+          ...res.data.job_posting,
+          job_post_id: res.data.job_post_id,
+          preference_id: res.data.id,
+        };
+        setSavedJobs((prev) => [...prev, newJob]);
+      } catch (err) {
+        if (err.response?.status === 400) {
+          alert("이미 찜한 공고입니다.");
+        } else {
+          console.error("❌ 찜 추가 오류:", err);
+        }
+      }
+    }
+  };
+
+  const handleCardClick = (jobId) => {
+    // 내부 컴포넌트로 상세 페이지 이동
+    if (onJobDetail) {
+      onJobDetail(jobId);
+    }
+  };
+
+  const handleSearch = () => {
+    setFilters(prev => ({
+      ...prev,
+      company_name: "", // 기존 company_name 필터 제거
+      title: "",        // 기존 title 필터 제거
+      search: searchInput // 새로 추가: 검색어를 search로 전달
+    }));
+  };
+
   return (
-    <JobCardRow>
-      <PrettyCard onClick={() => setSelectedPage("search")} $darkMode={darkMode}>
-        <CardHead>
-          <HighlightBar />
-          <h3>공고 검색</h3>
-        </CardHead>
-        <CardBody>원하는 키워드로 채용 공고를 찾아보세요.</CardBody>
-        <CardFoot>예: 백엔드 · 데이터 분석 · AI</CardFoot>
-        <IconBg><FiSearch /></IconBg>
-      </PrettyCard>
+    <Container>
+      {/* 1. 맨 위에 검색 입력칸/버튼만 남김 */}
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+        <input
+          type="text"
+          placeholder="회사명, 공고명으로 검색"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button onClick={handleSearch}>검색</button>
+      </div>
+      <JobCardFiltered filters={filters} setFilters={setFilters} />
+      <CardGrid>
+        {jobPosts.map((job) => (
+          <Card
+            key={job.id}
+            $darkMode={darkMode}
+            onClick={() => handleCardClick(job.id)}
+          >
+            {/* ✨ 3. 유사도 점수가 있을 경우, 배지로 표시합니다. */}
+            {job.similarity !== null && typeof job.similarity === 'number' && (
+              <SimilarityBadge $score={job.similarity}>
+                적합도 {(job.similarity * 100).toFixed(0)}%
+              </SimilarityBadge>
+            )}
 
-      <PrettyCard onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
-        <CardHead>
-          <HighlightBar />
-          <h3>찜한 공고</h3>
-        </CardHead>
-        <CardBody>저장한 공고를 한곳에서 모아보세요.</CardBody>
-        <CardFoot>최대 20개까지 자동 저장</CardFoot>
-        <IconBg><FiHeart /></IconBg>
-      </PrettyCard>
-    </JobCardRow>
+            <Title>{job.title}</Title>
+            <Company>{job.company_name}</Company>
+            <Info>{job.address}</Info>
+            <Dates>
+              {job.posting_date?.slice(0, 10)} ~{" "}
+              {job.deadline?.slice(0, 10) || "상시"}
+            </Dates>
+            <HeartButton
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleSave(job.id);
+              }}
+            >
+              {savedJobs.some((saved) => saved.job_post_id === job.id) ? (
+                <FaHeart color="red" />
+              ) : (
+                <FaRegHeart />
+              )}
+            </HeartButton>
+          </Card>
+        ))}
+      </CardGrid>
+    </Container>
   );
 }
 
-// ─────── 스타일 ───────
-const JobCardRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2.4rem;
-  margin-top: 1rem;
-
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
+/* ───────── styled-components ───────── */
+const SimilarityBadge = styled.div`
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: ${({ $score }) =>
+    $score >= 0.7 ? '#2a9d8f' : $score >= 0.4 ? '#f4a261' : '#e76f51'};
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  z-index: 2;
 `;
 
-const PrettyCard = styled.div`
-  position: relative;
-  padding: 2.8rem 2.4rem 2.2rem;
-  border-radius: 2rem;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
+const Container = styled.div`
+  padding: 20px;
+`;
 
-  ${({ $darkMode }) =>
-    $darkMode
-      ? css`
-          background: #222;
-          border: 1px solid #444;
-          color: #fefefe;
-        `
-      : css`
-          background: #f3f0eb;
-          border: 1px solid #ddd;
-          color: #3d3215;
-        `}
+const CardGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.4rem;
+`;
+
+const Card = styled.div`
+  position: relative;
+  border-radius: 1rem;
+  padding: 1.2rem;
+  padding-top: 2rem; // 배지 공간 확보
+  background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#fffdf7")};
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#ddd")};
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: transform 0.2s ease;
 
   &:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
   }
 `;
 
-
-const CardHead = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 1.2rem;
-
-  h3 {
-    font-size: 2rem;
-    font-weight: 800;
-    margin: 0;
-  }
+const Title = styled.div`
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 0.4rem;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
 `;
 
-const HighlightBar = styled.div`
-  width: 8px;
-  height: 1.6rem;
-  background: #ffc400;
-  border-radius: 4px;
-`;
-
-const CardBody = styled.p`
-  font-size: 1.1rem;
-  line-height: 1.56;
-  margin: 0 0 4.5rem;
-`;
-
-const CardFoot = styled.div`
+const Company = styled.div`
   font-size: 0.9rem;
-  color: #8b8b8b;
+  margin-bottom: 0.3rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#555'};
 `;
 
-const IconBg = styled.div`
+const Info = styled.div`
+  font-size: 0.85rem;
+  color: ${({ $darkMode }) => $darkMode ? '#bbb' : '#666'};
+`;
+
+const Dates = styled.div`
+  font-size: 0.8rem;
+  color: ${({ $darkMode }) => $darkMode ? '#888' : '#aaa'};
+  margin-top: 0.4rem;
+`;
+
+const HeartButton = styled.button`
   position: absolute;
-  right: -14%;
-  top: -14%;
-  font-size: 11rem;
-  opacity: 0.06;
-  pointer-events: none;
+  top: 0.6rem;
+  right: 0.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  z-index: 2;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 `;

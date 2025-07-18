@@ -1,85 +1,76 @@
-import React, { useState } from "react";
+/* ───────────── src/pages/Logout.jsx ───────────── */
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import axios from "axios";
 
-import Sidebar from "./Sidebar";
-import { FaSpinner } from "react-icons/fa";
-import styled, { keyframes } from "styled-components";
-
-
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
 export default function LogoutPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const logout = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (token) {
+          await axios.post(
+            `${BASE_URL}/auth/logout`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        }
+      } catch (err) {
+        console.error("❌ 로그아웃 API 실패:", err);
+      } finally {
+        // 모든 로컬 스토리지 데이터 삭제
+        const userId = localStorage.getItem("userId");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("chatSessionId");
+        localStorage.removeItem("lastSelectedPage");
+        
+        // 사용자별 캐시된 추천 공고도 삭제
+        if (userId) {
+          localStorage.removeItem(`cachedRecommendations_${userId}`);
+        }
+
+        // 즉시 홈화면으로 이동 (SPA 방식)
+        navigate("/", { replace: true });
+      }
+    };
+
+    // 즉시 로그아웃 실행
+    logout();
+  }, [navigate]);
 
   return (
-    <Container sidebarOpen={sidebarOpen}>
-      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      <CenteredContent>
-        <Spinner />
-        <h2>죄송해요, 대시보드를 불러올 수 없습니다</h2>
-        <p>다시 로그인해주세요</p>
-        <ActionButtons>
-          <button onClick={() => (window.location.href = "/login")}>로그인</button>
-        </ActionButtons>
-      </CenteredContent>
+    <Container>
+      <LogoutMessage>
+        <h2>로그아웃 중...</h2>
+      </LogoutMessage>
     </Container>
   );
 }
 
+/* ───────── styled-components ───────── */
 const Container = styled.div`
   display: flex;
-  background: #1c1c1c;
-  color: white;
-  min-height: 100vh;
-`;
-
-const CenteredContent = styled.div`
-  margin-left: ${({ sidebarOpen }) => (sidebarOpen ? "18vw" : "4.5rem")};
-  flex-grow: 1;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #f4f4f4;
+`;
+
+const LogoutMessage = styled.div`
   text-align: center;
+  
   h2 {
-    color: #ffc107;
-    font-size: 1.8rem;
-    margin-bottom: 1rem;
+    color: #666;
+    font-size: 1.2rem;
   }
-  p {
-    font-size: 1rem;
-    color: #ccc;
-    margin-bottom: 2rem;
-  }
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  gap: 1.5rem;
-  button {
-    background-color:rgb(179, 166, 127);
-    color: #1c1c1c;
-    font-weight: bold;
-    padding: 0.8rem 1.5rem;
-    border: none;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background-color 0.2s;
-
-    &:hover {
-      background-color: #e6b106;
-    }
-  }
-`;
-
-const spin = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-`;
-
-const Spinner = styled(FaSpinner)`
-  font-size: 3rem;
-  color: #ffc107;
-  margin-bottom: 1.5rem;
-  animation: ${spin} 1.2s linear infinite;
 `;

@@ -20,7 +20,7 @@ export default function ResumeSelect() {
     formData.append("resume_file", file);
 
     try {
-      const res = await axios.post("http://localhost:8000/resume/upload", formData, {
+      const res = await axios.post("https://3bd4-211-44-158-36.ngrok-free.app/resume/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,

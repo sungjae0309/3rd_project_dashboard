@@ -1,42 +1,56 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import WordCloud from "react-wordcloud";
 import "tippy.js/dist/tippy.css";
 import "tippy.js/animations/scale.css";
+import axios from "axios";
 
-export default function JobKeywordAnalysis() {
-  const words = useMemo(() => [
-    { text: "Python", value: 120 },
-    { text: "SQL", value: 100 },
-    { text: "머신러닝", value: 95 },
-    { text: "딥러닝", value: 90 },
-    { text: "Pandas", value: 85 },
-    { text: "Numpy", value: 80 },
-    { text: "통계분석", value: 75 },
-    { text: "시각화", value: 70 },
-    { text: "Matplotlib", value: 68 },
-    { text: "Seaborn", value: 66 },
-    { text: "데이터 전처리", value: 65 },
-    { text: "EDA", value: 60 },
-    { text: "모델링", value: 58 },
-    { text: "Scikit-Learn", value: 55 },
-    { text: "TensorFlow", value: 50 },
-    { text: "PyTorch", value: 48 },
-    { text: "Kaggle", value: 45 },
-    { text: "데이터 시각화", value: 40 },
-    { text: "추천시스템", value: 38 },
-    { text: "자연어 처리", value: 35 },
-    { text: "데이터베이스", value: 33 },
-    { text: "Git", value: 30 },
-    { text: "Github", value: 28 },
-    { text: "Jupyter Notebook", value: 26 },
-    { text: "빅데이터", value: 25 },
-    { text: "분류", value: 23 },
-    { text: "회귀", value: 22 },
-    { text: "클러스터링", value: 20 },
-    { text: "차원 축소", value: 18 },
-    { text: "정규화", value: 16 },
-  ], []);
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+
+export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFieldType }) {
+  const [trendData, setTrendData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 선택된 직무와 필드 타입의 트렌드 데이터 가져오기
+  useEffect(() => {
+    if (!selectedJob) return;
+
+    console.log("트렌드 데이터 요청 - 직무:", selectedJob, "필드:", selectedFieldType);
+
+    const fetchTrendData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await axios.get(`${BASE_URL}/stats/trend/${encodeURIComponent(selectedJob)}`, {
+          params: {
+            field_type: selectedFieldType,
+            week: 29 // 현재 주차 또는 최신 주차
+          }
+        });
+
+        console.log("트렌드 데이터 API 응답:", response.data);
+
+        // 트렌드 데이터를 워드클라우드 형식으로 변환
+        const words = response.data.trend_data.map(item => ({
+          text: item.skill,
+          value: item.count
+        }));
+
+        console.log("워드클라우드 데이터:", words);
+        setTrendData(words);
+      } catch (err) {
+        console.error("트렌드 데이터 로딩 실패:", err);
+        setError("트렌드 데이터를 불러오는데 실패했습니다.");
+        setTrendData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrendData();
+  }, [selectedJob, selectedFieldType]);
 
   const options = useMemo(() => ({
     rotations: 0,
@@ -48,17 +62,53 @@ export default function JobKeywordAnalysis() {
   }), []);
 
   return (
-    <CloudContainer>
-      <WordCloud words={words} options={options} />
-    </CloudContainer>
+    <AnalysisContainer>
+      {/* 워드클라우드 영역 */}
+      <CloudSection>
+        {loading ? (
+          <LoadingText $darkMode={darkMode}>트렌드 분석 중...</LoadingText>
+        ) : error ? (
+          <ErrorText $darkMode={darkMode}>{error}</ErrorText>
+        ) : !selectedJob ? (
+          <NoDataText $darkMode={darkMode}>직무를 선택해주세요</NoDataText>
+        ) : trendData.length === 0 ? (
+          <NoDataText $darkMode={darkMode}>트렌드 데이터가 없습니다</NoDataText>
+        ) : (
+          <WordCloud words={trendData} options={options} />
+        )}
+      </CloudSection>
+    </AnalysisContainer>
   );
 }
 
-const CloudContainer = styled.div`
-  height: 250px;
+const AnalysisContainer = styled.div`
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  overflow: hidden;
-  canvas {
-    border-radius: 10px;
-  }
+  height: 100%;
+`;
+
+const CloudSection = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+`;
+
+const LoadingText = styled.div`
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  font-size: 0.9rem;
+`;
+
+const ErrorText = styled.div`
+  color: #e74c3c;
+  font-size: 0.9rem;
+  text-align: center;
+`;
+
+const NoDataText = styled.div`
+  color: ${({ $darkMode }) => $darkMode ? '#888' : '#999'};
+  font-size: 0.9rem;
+  text-align: center;
 `;

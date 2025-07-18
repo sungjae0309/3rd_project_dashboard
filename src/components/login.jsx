@@ -6,11 +6,9 @@ import { FaUser, FaLock } from "react-icons/fa";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ username: "", password: "" });
 
+  // ───── 네이버 SDK 로드 ─────
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://static.nid.naver.com/js/naveridlogin_js_sdk_2.0.2.js";
@@ -21,32 +19,52 @@ export default function Login() {
 
   const initNaver = () => {
     if (!window.naver) return;
-    const naverLogin = new window.naver.LoginWithNaverId({
+    new window.naver.LoginWithNaverId({
       clientId: process.env.REACT_APP_NAVER_CLIENT_ID,
       callbackUrl: `${window.location.origin}/navercallback`,
       isPopup: false,
       loginButton: { color: "green", type: 3, height: 48 },
-    });
-    naverLogin.init();
+    }).init();
   };
 
+  // ───── 입력 핸들러 ─────
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ───── 로그인 요청 ─────
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("/api/login", formData);
+      const payload = new URLSearchParams();
+      payload.append("username", formData.username);
+      payload.append("password", formData.password);
+
+      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+
+      const { data: tokenRes } = await axios.post(
+        `${BASE_URL}/token`,
+        payload,
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+
+      const token = tokenRes.access_token;
+      localStorage.setItem("accessToken", token);
+      localStorage.removeItem("chatSessionId"); // 세션 초기화
+
+      const { data: userRes } = await axios.get(
+        `${BASE_URL}/users/me`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      localStorage.setItem("userId", userRes.id);
+
       alert("로그인 성공!");
-      navigate("/dashboard");
+      navigate("/aijob");
     } catch (err) {
-      console.error(err);
-      alert("로그인 실패");
+      console.error("로그인 실패:", err.response?.data || err.message);
+      alert("로그인 실패: " + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -59,17 +77,22 @@ export default function Login() {
 
         <FormContainer onSubmit={handleSubmit}>
           <InputGroup>
-            <Icon><FaUser /></Icon>
+            <Icon>
+              <FaUser />
+            </Icon>
             <Input
               name="username"
-              placeholder="아이디"
+              placeholder="아이디 또는 이메일"
               value={formData.username}
               onChange={handleChange}
               required
             />
           </InputGroup>
+
           <InputGroup>
-            <Icon><FaLock /></Icon>
+            <Icon>
+              <FaLock />
+            </Icon>
             <Input
               name="password"
               type="password"
@@ -81,28 +104,23 @@ export default function Login() {
           </InputGroup>
 
           <SubmitBtn type="submit">로그인</SubmitBtn>
+
           <SignupText>
-  계정이 없으신가요? <a onClick={() => navigate("/register")}>회원가입</a>
-</SignupText>
+            계정이 없으신가요?{" "}
+            <a onClick={() => navigate("/register")}>회원가입</a>
+          </SignupText>
+
           <Divider />
-
-<SnsLoginArea>
-  <SNSButton id="naverIdLogin" />
-</SnsLoginArea>
-
+          <SnsLoginArea>
+            <SNSButton id="naverIdLogin" />
+          </SnsLoginArea>
         </FormContainer>
-
-        <SnsLoginArea>
-          <SNSButton id="naverIdLogin" />
-        </SnsLoginArea>
       </MainBox>
     </Bg>
-
-    
   );
 }
 
-
+/* ───── styled-components ───── */
 const Bg = styled.div`
   min-height: 100vh;
   background: #f4f4f4;
@@ -115,7 +133,7 @@ const Bg = styled.div`
 const MainBox = styled.div`
   background: #ffffff;
   border-radius: 1.8rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 420px;
   padding: 2.5rem 2rem;
@@ -165,6 +183,7 @@ const Input = styled.input`
   border: none;
   color: #333;
   font-size: 1rem;
+
   &::placeholder {
     color: #aaa;
   }
@@ -207,7 +226,6 @@ const SNSButton = styled.div`
   max-width: 240px;
   height: 48px;
   background: transparent;
-  
 `;
 
 const SignupText = styled.div`

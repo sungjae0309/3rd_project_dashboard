@@ -1,42 +1,40 @@
 import React, { useState } from "react";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 import PromptInput from "./PromptInput";
 
 export default function PromptBar({ darkMode, activePage, onSubmit }) {
-  const [text, setText] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+
+  const handleSubmit = () => {
+    const trimmed = userQuery.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);      // ✅ 먼저 전달
+    setUserQuery("");       // ✅ 그 다음에 초기화
+  };
+  
+  
 
   return (
-    <Wrapper>
+    <Wrapper> 
       <Prompt $darkMode={darkMode}>
         <PromptText>JOB자에게 메시지</PromptText>
 
         <PromptInput
-          placeholder={
-            activePage === "ai-jobs"
-              ? "추천받고 싶은 조건을 입력하세요…"
-              : "무엇이든 물어보세요…"
-          }
+          userQuery={userQuery}
+          setUserQuery={setUserQuery}
+          handleSubmit={handleSubmit}
           darkMode={darkMode}
-          userQuery={text}
-          setUserQuery={setText}
-          handleSubmit={() => {
-            onSubmit(text);
-            setText("");          // 전송 후 비우기
-          }}
         />
 
-        <PromptButton onClick={() => {
-          onSubmit(text);
-          setText("");
-        }}>
-          전송
-        </PromptButton>
+        <PromptButton onClick={handleSubmit}>전송</PromptButton>
       </Prompt>
     </Wrapper>
   );
 }
 
-/* ─── 스타일 (MainContent 것 그대로 복사) ─── */
+/* 스타일 생략 */
+
+
 const Wrapper = styled.div`
   position: fixed;
   bottom: 2.5rem;
@@ -49,6 +47,7 @@ const Wrapper = styled.div`
   justify-content: center;
   height: 80px;
 `;
+
 const Prompt = styled.div`
   display: flex;
   align-items: center;
@@ -60,10 +59,12 @@ const Prompt = styled.div`
   ${({ $darkMode }) =>
     $darkMode ? "background:#333;" : "background:rgb(188, 185, 179);"}
 `;
+
 const PromptText = styled.div`
   font-size: 1rem;
   color: rgb(25, 19, 1);
 `;
+
 const PromptButton = styled.button`
   padding: 1.4rem 1.2rem;
   background: #ffc107;
@@ -72,5 +73,7 @@ const PromptButton = styled.button`
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
-  &:hover { background: #ffb300; }
+  &:hover {
+    background: #ffb300;
+  }
 `;
