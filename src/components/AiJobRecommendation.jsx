@@ -27,7 +27,11 @@ apiClient.interceptors.request.use((config) => {
  */
 const fetchAiJobRecommendations = async () => {
   // 1페이지용 API 호출 (가장 적합한 공고)
-  const { data } = await apiClient.get("/recommend/jobs/ids");
+  const { data } = await apiClient.get("/recommend/jobs/ids", {
+    params: {
+      force_refresh: false // 캐시 사용 (1시간 캐싱)
+    }
+  });
   return data;
 };
 

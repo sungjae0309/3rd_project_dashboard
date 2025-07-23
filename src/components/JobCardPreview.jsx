@@ -17,14 +17,24 @@ export default function JobCardPreview({ darkMode, savedJobs, setSavedJobs, onJo
   });
 
   const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearchInput, setDebouncedSearchInput] = useState("");
 
   useEffect(() => {
     fetchJobs();
-  }, [filters]);
+  }, [filters, debouncedSearchInput]);
 
   useEffect(() => {
     fetchSavedJobs();
   }, []);
+
+  // 디바운싱을 300ms로 단축하여 더 빠른 검색
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchInput(searchInput);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchJobs = async () => {
     try {
@@ -32,8 +42,17 @@ export default function JobCardPreview({ darkMode, savedJobs, setSavedJobs, onJo
       const token = localStorage.getItem("accessToken");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
+      // 검색어가 있을 경우 회사명과 공고명에 검색어 포함
+      const params = { ...filters };
+      
+      // 검색어가 있으면 회사명과 공고명 필터에 추가
+      if (debouncedSearchInput.trim()) {
+        params.company_name = debouncedSearchInput.trim();
+        params.title = debouncedSearchInput.trim();
+      }
+
       const res = await axios.get(`${BASE_URL}/job_posts/`, {
-        params: filters,
+        params: params,
         headers: headers, // 헤더에 토큰 추가
       });
 
@@ -126,29 +145,24 @@ export default function JobCardPreview({ darkMode, savedJobs, setSavedJobs, onJo
     }
   };
 
-  const handleSearch = () => {
-    setFilters(prev => ({
-      ...prev,
-      company_name: "", // 기존 company_name 필터 제거
-      title: "",        // 기존 title 필터 제거
-      search: searchInput // 새로 추가: 검색어를 search로 전달
-    }));
-  };
-
   return (
-    <Container>
-      {/* 1. 맨 위에 검색 입력칸/버튼만 남김 */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="회사명, 공고명으로 검색"
-          value={searchInput}
-          onChange={e => setSearchInput(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <button onClick={handleSearch}>검색</button>
-      </div>
-      <JobCardFiltered filters={filters} setFilters={setFilters} />
+    <Container $darkMode={darkMode}>
+      {/* ✨ [스타일 개선] 검색 및 필터링을 더 컴팩트하게 */}
+      <SearchSection $darkMode={darkMode}>
+        <SearchBar>
+          <SearchInput
+            type="text"
+            placeholder="회사명, 공고명으로 검색"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            $darkMode={darkMode}
+          />
+        </SearchBar>
+        
+        <FilterSection>
+          <JobCardFiltered filters={filters} setFilters={setFilters} darkMode={darkMode} />
+        </FilterSection>
+      </SearchSection>
       <CardGrid>
         {jobPosts.map((job) => (
           <Card
@@ -190,6 +204,48 @@ export default function JobCardPreview({ darkMode, savedJobs, setSavedJobs, onJo
 }
 
 /* ───────── styled-components ───────── */
+
+// ✨ [개선] 검색 및 필터링 스타일을 더 컴팩트하게
+const SearchSection = styled.div`
+  background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#f8f9fa")};
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+`;
+
+const SearchBar = styled.div`
+  margin-bottom: 1rem;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  padding: 0.8rem 1.2rem;
+  border: 2px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+  border-radius: 0.6rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#fff")};
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  
+  &:focus {
+    outline: none;
+    border-color: #ffa500;
+    box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.1);
+  }
+  
+  &::placeholder {
+    color: ${({ $darkMode }) => ($darkMode ? "#888" : "#999")};
+  }
+`;
+
+const FilterSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+`;
+
 const SimilarityBadge = styled.div`
   position: absolute;
   top: 10px;

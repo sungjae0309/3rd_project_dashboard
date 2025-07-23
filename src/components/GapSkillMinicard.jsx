@@ -19,7 +19,10 @@ export default function GapSkillMiniCard({ selectedJob, darkMode }) {
       .then((res) => {
         setSkills(res.data.top_skills?.slice(0, 5) || []);
       })
-      .catch(() => setSkills([]))
+      .catch((error) => {
+        console.error('갭 분석 미니카드 오류:', error);
+        setSkills([]);
+      })
       .finally(() => setLoading(false));
   }, [selectedJob]);
 

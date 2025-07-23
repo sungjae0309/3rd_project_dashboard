@@ -6,7 +6,7 @@ import {
   FaHeart,
   FaRocket,
   FaSearch,
-  FaBars,
+  FaTimes,
   FaHistory,
   FaHome,
   FaComments
@@ -21,12 +21,19 @@ export default function Sidebar({
   darkMode
 }) {
   const [careerOpen, setCareerOpen] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(true);
 
   const careerSubpages = [
     { key: "career-summary", label: "종합" },
     { key: "career-trend", label: "트렌드 분석" },
     { key: "career-gap", label: "갭 분석" },
     { key: "career-plan", label: "극복 방안" }
+  ];
+
+  const searchSubpages = [
+    { key: "search", label: "공고" },
+    { key: "roadmap-bootcamps", label: "부트캠프" },
+    { key: "roadmap-courses", label: "강의" }
   ];
 
   return (
@@ -36,6 +43,9 @@ export default function Sidebar({
           <LogoText collapsed={collapsed}>JOB</LogoText>
           <span style={{ color: "#fff" }}>자</span>
         </Logo>
+        <CollapseBtn onClick={() => setCollapsed(!collapsed)} $darkMode={darkMode}>
+          <FaTimes />
+        </CollapseBtn>
       </TopBar>
 
       <NavSection>
@@ -45,10 +55,11 @@ export default function Sidebar({
         </NavItem>
         <Divider $darkMode={darkMode} />
 
-        <NavItem onClick={() => setSelectedPage("ai-jobs")} $darkMode={darkMode}>
-          <FaRocket />
-          <NavText collapsed={collapsed}><strong>AI 추천 공고</strong></NavText>
+        <NavItem onClick={() => setSelectedPage("todo")} $darkMode={darkMode}>
+          <FaClipboardList />
+          <NavText collapsed={collapsed}><strong>To-do List</strong></NavText>
         </NavItem>
+        <Divider $darkMode={darkMode} />
 
         <NavItem onClick={() => setCareerOpen(!careerOpen)} $darkMode={darkMode}>
           <FaBullseye />
@@ -65,14 +76,28 @@ export default function Sidebar({
             <SubItem
               key={sub.key}
               onClick={() => {
-                if (sub.key === "career-gap") {
+                if (sub.key === "career-trend") {
+                  setSelectedPage("career-trend");
+                } else if (sub.key === "career-gap") {
                   setSelectedPage("career-summary");
+                  // URL 파라미터를 추가하여 갭 분석 섹션으로 스크롤
+                  const url = new URL(window.location);
+                  url.searchParams.set('section', 'gap-analysis-section');
+                  window.history.pushState({}, '', url);
                   setTimeout(() => {
                     const gapSection = document.getElementById("gap-analysis-section");
                     if (gapSection) gapSection.scrollIntoView({ behavior: "smooth" });
-                  }, 200); // 렌더링 이후 실행 (200ms는 충분한 렌더링 대기)
-                } else if (sub.key === "career-trend") {
-                  setSelectedPage("career-trend");
+                  }, 200);
+                } else if (sub.key === "career-plan") {
+                  setSelectedPage("career-summary");
+                  // URL 파라미터를 추가하여 극복 방안 섹션으로 스크롤
+                  const url = new URL(window.location);
+                  url.searchParams.set('section', 'overcome-plan-section');
+                  window.history.pushState({}, '', url);
+                  setTimeout(() => {
+                    const overcomeSection = document.getElementById("overcome-plan-section");
+                    if (overcomeSection) overcomeSection.scrollIntoView({ behavior: "smooth" });
+                  }, 200);
                 } else {
                   setSelectedPage(sub.key);
                 }
@@ -84,24 +109,35 @@ export default function Sidebar({
             </SubItem>
           ))
         }
-
         <Divider $darkMode={darkMode} />
 
-        <NavItem onClick={() => setSelectedPage("todo")} $darkMode={darkMode}>
-          <FaClipboardList />
-          <NavText collapsed={collapsed}><strong>To-do List</strong></NavText>
+        <NavItem onClick={() => setSearchOpen(!searchOpen)} $darkMode={darkMode}>
+          <FaSearch />
+          <NavText collapsed={collapsed}><strong>검색</strong></NavText>
+          {!collapsed && (
+            <ArrowIcon open={searchOpen}>
+              <IoIosArrowDown />
+            </ArrowIcon>
+          )}
         </NavItem>
 
-        <NavItem onClick={() => setSelectedPage("search")} $darkMode={darkMode}>
-          <FaSearch />
-          <NavText collapsed={collapsed}><strong>공고 검색</strong></NavText>
-        </NavItem>
+        {searchOpen && !collapsed &&
+          searchSubpages.map(sub => (
+            <SubItem
+              key={sub.key}
+              onClick={() => setSelectedPage(sub.key)}
+              $darkMode={darkMode}
+            >
+              <Dot>•</Dot>
+              <strong>{sub.label}</strong>
+            </SubItem>
+          ))
+        }
 
         <NavItem onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
           <FaHeart />
           <NavText collapsed={collapsed}><strong>찜한 페이지</strong></NavText>
         </NavItem>
-
         <Divider $darkMode={darkMode} />
 
         <NavItem onClick={() => setSelectedPage("chat")} $darkMode={darkMode}>
@@ -114,12 +150,6 @@ export default function Sidebar({
           <NavText collapsed={collapsed}><strong>대화 이력</strong></NavText>
         </NavItem>
       </NavSection>
-
-      <Footer collapsed={collapsed}>
-        <CollapseBtn onClick={() => setCollapsed(!collapsed)}>
-          <FaBars />
-        </CollapseBtn>
-      </Footer>
     </Wrapper>
   );
 }
@@ -143,6 +173,7 @@ const Wrapper = styled.aside`
 const TopBar = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 1rem;
 `;
 
@@ -244,5 +275,18 @@ const Footer = styled.div`
 const CollapseBtn = styled.div`
   font-size: 1.2rem;
   cursor: pointer;
-  ${({ theme }) => css`color: ${theme?.colors?.textSecondary || "#888"};`}
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+  color: ${({ $darkMode }) => $darkMode ? "#ccc" : "#666"};
+  
+  &:hover {
+    color: #ff4757;
+    background: ${({ $darkMode }) => $darkMode ? "#3a3a3a" : "#f0f0f0"};
+  }
+`;
+
+const SubIcon = styled.div`
+  font-size: 0.9rem;
+  color: ${({ $darkMode }) => $darkMode ? "#ccc" : "#666"};
 `;

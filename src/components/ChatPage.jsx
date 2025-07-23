@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import styled, { keyframes } from "styled-components";
 import PromptBar from "./PromptBar";
+import { FaPlus } from "react-icons/fa";
 import {
   createChatSession,
   fetchChatHistory,
@@ -53,15 +54,25 @@ export default function ChatPage({
     }
   }, [sessionId, token, onNewSession]);
 
-
   useEffect(() => {
     loadOrCreateSession();
   }, [loadOrCreateSession]);
 
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // 새 채팅 세션 생성 함수
+  const handleNewChat = async () => {
+    try {
+      const data = await createChatSession(token);
+      if (isMounted.current && onNewSession) {
+        onNewSession(data.id);
+      }
+    } catch (e) {
+      console.error("새 채팅 세션 생성 실패:", e);
+    }
+  };
 
   const handlePromptSubmit = async (text) => {
     const trimmed = text.trim();
@@ -84,7 +95,7 @@ export default function ChatPage({
           ...h,
           {
             role: "assistant",
-            content: ans.answer || "죄송합니다. 응답을 생성할 수 없습니다.", // ans.answer가 없는 경우를 대비
+            content: ans.answer || "죄송합니다. 응답을 생성할 수 없습니다.",
             timestamp: new Date().toISOString(),
           },
         ]);
@@ -120,6 +131,10 @@ export default function ChatPage({
     <Container $darkMode={darkMode}>
       <Header>
         <Info>Session #{sessionId}</Info>
+        {/* 새 채팅 버튼 추가 */}
+        <NewChatButton onClick={handleNewChat} $darkMode={darkMode}>
+          <FaPlus /> 새 채팅
+        </NewChatButton>
       </Header>
 
       <ChatWindow>
@@ -143,7 +158,6 @@ export default function ChatPage({
       
       <PromptBarWrapper>
           <PromptBar
-            // ✅ [수정 완료]
             onSubmit={(text) => {
                 handlePromptSubmit(text);
             }}
@@ -155,7 +169,7 @@ export default function ChatPage({
   );
 }
 
-// ─── Styled Components (기존과 동일) ────────────────────────
+// ─── Styled Components ────────────────────────
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -165,7 +179,6 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
-  // 이 부분이 배경색을 결정합니다.
   background: ${({ $darkMode }) => ($darkMode ? "rgb(255, 255, 255)" : "rgb(255, 255, 255)")};
 `;
 
@@ -179,6 +192,26 @@ const Header = styled.div`
 
 const Info = styled.span`
   font-weight: bold;
+`;
+
+const NewChatButton = styled.button`
+  background: #fbbf24;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: #f59e0b;
+    transform: translateY(-1px);
+  }
 `;
 
 const ChatWindow = styled.div`

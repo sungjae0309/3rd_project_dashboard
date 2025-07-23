@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
+// dashboard_2/frontend_copy/src/components/CareerPlanFlow.jsx
+
+import React, { useState, useEffect } from 'react'; // useEffect 추가
 import RoadmapCategory from './RoadmapCategory';
 import RoadmapList from './RoadmapList';
 import CareerRoadmapDetail from './CareerRoadmapDetail';
 
-// 1. props로 userId를 받도록 추가
-export default function CareerPlanFlow({ darkMode, userId }) {
-  const [view, setView] = useState('category');
-  const [selectedCategory, setSelectedCategory] = useState(null);
+export default function CareerPlanFlow({ darkMode, userId, initialCategory = null }) {
+  // 초기 상태 설정은 그대로 둡니다.
+  const [view, setView] = useState(initialCategory ? 'list' : 'category');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedRoadmapId, setSelectedRoadmapId] = useState(null);
+
+  // ========================= [페이지 이동 문제 해결] =========================
+  // initialCategory prop이 변경될 때마다 view와 category 상태를 업데이트합니다.
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+      setView('list');
+    }
+  }, [initialCategory]); // initialCategory가 바뀔 때마다 이 효과가 실행됩니다.
+  // =====================================================================
 
   const handleSelectCategory = (category) => {
     setSelectedCategory(category);
@@ -29,6 +41,7 @@ export default function CareerPlanFlow({ darkMode, userId }) {
     }
   };
 
+  // switch 문은 기존과 동일합니다.
   switch (view) {
     case 'list':
       return (
@@ -37,7 +50,7 @@ export default function CareerPlanFlow({ darkMode, userId }) {
           onSelectRoadmap={handleSelectRoadmap}
           onBack={handleBack}
           darkMode={darkMode}
-          userId={userId} // 2. RoadmapList에 userId 전달
+          userId={userId}
         />
       );
     case 'detail':
@@ -46,8 +59,6 @@ export default function CareerPlanFlow({ darkMode, userId }) {
           roadmapId={selectedRoadmapId}
           onBack={handleBack}
           darkMode={darkMode}
-          // 상세 페이지에도 찜하기 버튼을 추가한다면 userId 전달 필요
-          // userId={userId} 
         />
       );
     case 'category':

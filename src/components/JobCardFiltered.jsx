@@ -2,29 +2,28 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import axios from "axios";
+import { useJobNames } from "../contexts/JobNamesContext";
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
-export default function JobCardFiltered({ filters, setFilters }) {
+export default function JobCardFiltered({ filters, setFilters, darkMode = false }) {
 
   const [techStacks, setTechStacks] = useState([]);
   const [employmentTypes, setEmploymentTypes] = useState([]);
   const [applicantTypes, setApplicantTypes] = useState([]);
-  const [jobNames, setJobNames] = useState([]);
-  const [selectedJobName, setSelectedJobName] = useState("");
-  const [jobs, setJobs] = useState([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // 전역 직무명 상태 사용
+  const { jobNames } = useJobNames();
 
   useEffect(() => {
     const fetchFilters = async () => {
       try {
         const [
-      
           techStackRes,
           employmentRes,
           applicantRes
         ] = await Promise.all([
-     
           axios.get(`${BASE_URL}/job_posts/unique_tech_stacks`),
           axios.get(`${BASE_URL}/job_posts/unique_employment_types`),
           axios.get(`${BASE_URL}/job_posts/unique_applicant_types`)
@@ -38,38 +37,7 @@ export default function JobCardFiltered({ filters, setFilters }) {
       }
     };
     fetchFilters();
-
-    // 1. 직무명 리스트 불러오기
-    const fetchJobNames = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/job-skills/job-names`);
-        const data = await response.json();
-        console.log("JobCardFiltered 직무명 응답:", data);
-        setJobNames(data);
-      } catch (error) {
-        console.error("JobCardFiltered 직무명 불러오기 실패:", error);
-      }
-    };
-    fetchJobNames();
-
-    // 2. 공고 리스트 불러오기 (직무명 선택 시마다)
-    let url = `${BASE_URL}/job_posts/?limit=50`;
-    if (selectedJobName) {
-      url += `&job_name=${encodeURIComponent(selectedJobName)}`;
-    }
-    console.log("API 요청 URL:", url); // ← 실제 요청 URL 확인
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("API 응답 데이터:", data);
-        if (!Array.isArray(data)) {
-          setJobs([]);
-          return;
-        }
-        setJobs(data);
-      })
-      .catch((err) => console.error("공고 불러오기 실패:", err));
-  }, [selectedJobName]);
+  }, []);
 
   const handleChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -81,99 +49,105 @@ export default function JobCardFiltered({ filters, setFilters }) {
     setSearchTerm(searchInput);
   };
 
-  // 필터링 로직
-  const filteredJobs = jobs.filter((job) => {
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      const company = (job.company_name || "").toLowerCase();
-      const title = (job.title || "").toLowerCase();
-      // 회사명 또는 공고명에 포함되어야 통과
-      if (!company.includes(lower) && !title.includes(lower)) {
-        return false;
-      }
-    }
-    // 직무명 필터
-    if (selectedJobName && job.job_name !== selectedJobName) {
-      return false;
-    }
-    return true;
-  });
-
   return (
-    <FilterWrapper>
-
-
-      {/* 나머지 필터/드롭다운/공고 리스트 ... */}
-      {/* 아래쪽에 입력칸/검색 버튼이 있었다면 완전히 삭제! */}
-
-      {/* 2. 기술스택 필터 */}
-      <Select onChange={(e) => handleChange("tech_stack", e.target.value)}>
-        <option value="">기술스택</option>
-        {techStacks.map((stack) => (
-          <option key={stack} value={stack}>{stack}</option>
-        ))}
-      </Select>
-
-      {/* 3. 고용형태 필터 */}
-      <Select onChange={(e) => handleChange("employment_type", e.target.value)}>
-        <option value="">고용형태</option>
-        {employmentTypes.map((type) => (
-          <option key={type} value={type}>{type}</option>
-        ))}
-      </Select>
-
-      {/* 4. 지원자 유형 필터 */}
-      <Select onChange={(e) => handleChange("applicant_type", e.target.value)}>
-        <option value="">지원자 유형</option>
-        {applicantTypes.map((type) => (
-          <option key={type} value={type}>{type}</option>
-        ))}
-      </Select>
-
-      {/* 3. 직무명 드롭다운 (라벨 제거, 전체 → 직무) */}
-      <div style={{ marginBottom: "1rem" }}>
-        <select
-          id="jobNameDropdown"
-          value={selectedJobName}
-          onChange={(e) => setSelectedJobName(e.target.value)}
+    <FilterSection $darkMode={darkMode}>
+      <FilterGroup>
+        <FilterLabel $darkMode={darkMode}>기술스택</FilterLabel>
+        <FilterSelect 
+          value={filters.tech_stack || ""} 
+          onChange={(e) => handleChange("tech_stack", e.target.value)}
+          $darkMode={darkMode}
         >
-          <option value="">직무</option>
+          <option value="">전체</option>
+          {techStacks.map((stack) => (
+            <option key={stack} value={stack}>{stack}</option>
+          ))}
+        </FilterSelect>
+      </FilterGroup>
+
+      <FilterGroup>
+        <FilterLabel $darkMode={darkMode}>고용형태</FilterLabel>
+        <FilterSelect 
+          value={filters.employment_type || ""} 
+          onChange={(e) => handleChange("employment_type", e.target.value)}
+          $darkMode={darkMode}
+        >
+          <option value="">전체</option>
+          {employmentTypes.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </FilterSelect>
+      </FilterGroup>
+
+      <FilterGroup>
+        <FilterLabel $darkMode={darkMode}>지원자 유형</FilterLabel>
+        <FilterSelect 
+          value={filters.applicant_type || ""} 
+          onChange={(e) => handleChange("applicant_type", e.target.value)}
+          $darkMode={darkMode}
+        >
+          <option value="">전체</option>
+          {applicantTypes.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </FilterSelect>
+      </FilterGroup>
+
+      <FilterGroup>
+        <FilterLabel $darkMode={darkMode}>직무</FilterLabel>
+        <FilterSelect 
+          value={filters.job_name || ""} 
+          onChange={(e) => handleChange("job_name", e.target.value)}
+          $darkMode={darkMode}
+        >
+          <option value="">전체</option>
           {jobNames.map(job => (
             <option key={job.name} value={job.name}>
               {job.name}
             </option>
           ))}
-        </select>
-      </div>
-
-      {/* 공고 리스트 */}
-      {filteredJobs.map((job) => (
-        <div key={job.id}>
-          <b>{job.title}</b> ({job.company_name})
-        </div>
-      ))}
-    </FilterWrapper>
+        </FilterSelect>
+      </FilterGroup>
+    </FilterSection>
   );
 }
 
-// ────────────── 💄 스타일링
-const FilterWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-  width: 100%;
-  max-width: 260px;  // 💡 너무 넓어지지 않게 제한
+// ────────────── 💄 스타일링 개선
+const FilterSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 `;
 
-const Select = styled.select`
-  padding: 6px 10px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-  background: white;
-  font-size: 13px;
-  width: 100%;
-  box-sizing: border-box;
-  min-width: 200px;
-  max-width: 100%;
+const FilterGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%; /* 그룹이 전체 너비를 사용하도록 */
+`;
+
+const FilterLabel = styled.label`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#555")};
+`;
+
+const FilterSelect = styled.select`
+  padding: 0.6rem 0.8rem;
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#ddd")};
+  border-radius: 0.5rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#fff")};
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 2.5rem; /* 모든 드롭다운의 높이를 동일하게 설정 */
+  width: 100%; /* 각 드롭다운이 그룹의 전체 너비를 사용 */
+  box-sizing: border-box; /* 패딩과 보더가 너비에 포함되도록 */
+  
+  &:focus {
+    outline: none;
+    border-color: #ffa500;
+    box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.1);
+  }
 `;

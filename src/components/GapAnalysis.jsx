@@ -1,8 +1,9 @@
 /* ───────── src/components/GapAnalysis.jsx ───────── */
 import React, { useEffect, useState } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import axios from "axios";
 import { IoIosArrowUp } from "react-icons/io";
+import { useAuth } from "../contexts/AuthContext"; // AuthContext 사용
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
@@ -10,18 +11,55 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
   const [gapResult, setGapResult] = useState("");
   const [topSkills, setTopSkills] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userJob, setUserJob] = useState(""); // 사용자 관심직무 상태 추가
+  const [hasInitialized, setHasInitialized] = useState(false); // 초기화 상태 추가
+  
+  // AuthContext에서 로그인 상태 가져오기
+  const { isLoggedIn } = useAuth();
 
   useEffect(() => {
+    // 로그인하지 않았으면 API 호출하지 않음
+    if (!isLoggedIn) {
+      setGapResult("로그인이 필요합니다.");
+      setTopSkills([]);
+      setLoading(false);
+      return;
+    }
+
+    // 이미 초기화되었으면 다시 호출하지 않음
+    if (hasInitialized) {
+      return;
+    }
+
     const fetchGapAnalysis = async () => {
       try {
-        // 1. 사용자 이력 정보 가져오기
+        // 1. 사용자 희망 직무 정보 가져오기
         const token = localStorage.getItem("accessToken");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const { data: resume } = await axios.get(`${BASE_URL}/users/me/resume`, { headers });
-        // 2. 관심 직무(혹은 선택 직무) 추출
-        const desiredJobs = resume.desired_job || [];
-        const jobCategory = desiredJobs[0]; // 첫 번째 직무 사용 (필요시 선택 UI 추가)
+        console.log('🔍 [GapAnalysis] 토큰 확인:', token ? '있음' : '없음');
+        console.log('🔍 [GapAnalysis] API 호출 URL:', `${BASE_URL}/users/desired-job`);
+
+        let jobCategory;
+        
+        // 로그인 여부와 관계없이 API 호출 (API가 회원/비회원을 구분해서 처리)
+        try {
+          console.log('🔍 [GapAnalysis] API 호출 시작...');
+          const { data: desiredJobData } = await axios.get(`${BASE_URL}/users/desired-job`, { headers });
+          console.log('✅ [GapAnalysis] API 응답 성공:', desiredJobData);
+          // 백엔드에서 직접 문자열로 보내주므로 data 자체가 직무명
+          jobCategory = desiredJobData;
+          setUserJob(desiredJobData); // 사용자 관심직무 상태 업데이트
+          console.log('✅ [GapAnalysis] 추출된 직무:', jobCategory);
+        } catch (err) {
+          console.error('❌ [GapAnalysis] 희망 직무 API 호출 실패:', err);
+          console.error('❌ [GapAnalysis] 에러 상세:', err.response?.data);
+          // API 호출 실패 시에만 기본값 사용
+          jobCategory = "프론트엔드 개발자";
+          setUserJob("프론트엔드 개발자");
+        }
+
+        console.log('🔍 [GapAnalysis] 최종 사용할 직무:', jobCategory);
 
         if (!jobCategory) {
           setGapResult("관심 직무가 등록되어 있지 않습니다.");
@@ -39,22 +77,37 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
         setGapResult(gapData.gap_result || "분석 결과가 없습니다.");
         setTopSkills(gapData.top_skills || []);
       } catch (err) {
-        setGapResult("갭 분석 결과를 불러오지 못했습니다.");
+        console.error('갭 분석 오류:', err);
+        
+        // API 키 제한 오류인지 확인
+        if (err.response?.status === 403 && err.response?.data?.error?.message?.includes('Key limit exceeded')) {
+          setGapResult("AI 분석 서비스가 일시적으로 제한되었습니다. 잠시 후 다시 시도해주세요.");
+        } else if (err.response?.status === 401) {
+          setGapResult("로그인이 필요합니다.");
+        } else if (err.response?.status === 404) {
+          setGapResult("분석할 데이터가 없습니다.");
+        } else {
+          setGapResult("갭 분석 결과를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+        }
         setTopSkills([]);
       } finally {
         setLoading(false);
+        setHasInitialized(true); // 초기화 완료
       }
     };
 
     fetchGapAnalysis();
-  }, []);
+  }, [isLoggedIn, hasInitialized]); // isLoggedIn을 의존성에 추가
 
   return (
     <Container $darkMode={darkMode}>
       <SectionCard>
-        <Title>갭 분석 결과</Title>
+        <Title>
+          갭 분석 결과
+          {userJob && <UserJobBadge $darkMode={darkMode}>관심직무: {userJob}</UserJobBadge>}
+        </Title>
         {loading ? (
-          <p>분석 중...</p>
+          <LoadingText>분석 중...</LoadingText>
         ) : (
           <>
             <ResultText>
@@ -62,12 +115,15 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
             </ResultText>
             {topSkills.length > 0 && (
               <SkillList>
-                <b>Top 5 부족 역량:</b>
-                <ul>
-                  {topSkills.map((skill, idx) => (
-                    <li key={idx}>{skill}</li>
+                <SkillTitle>Top 5 부족 역량:</SkillTitle>
+                <SkillGrid>
+                  {topSkills.slice(0, 5).map((skill, idx) => (
+                    <SkillItem key={idx} $darkMode={darkMode}>
+                      <SkillRank>{idx + 1}</SkillRank>
+                      <SkillName>{skill}</SkillName>
+                    </SkillItem>
                   ))}
-                </ul>
+                </SkillGrid>
               </SkillList>
             )}
           </>
@@ -141,10 +197,59 @@ const ResultText = styled.pre`
 const SkillList = styled.div`
   font-size: 1rem;
   margin-top: 1rem;
-  ul {
-    margin: 0.5rem 0 0 1.2rem;
-    padding: 0;
-  }
+`;
+
+const SkillTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+`;
+
+const SkillGrid = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const SkillItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.4rem;
+  background: ${({ $darkMode }) => $darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'};
+`;
+
+const SkillRank = styled.div`
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: #ffc107;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+`;
+
+const SkillName = styled.div`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const LoadingText = styled.div`
+  font-size: 0.8rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  text-align: center;
+  margin-top: 0.8rem;
 `;
 
 const bounce = keyframes`

@@ -4,49 +4,27 @@ import { FaHeart, FaTrashAlt } from "react-icons/fa";
 import axios from 'axios';
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
-export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail }) {
-  const [savedRoadmaps, setSavedRoadmaps] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchSavedRoadmaps = useCallback(async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!userId || !token) {
-      setSavedRoadmaps([]);
-      setLoading(false);
-      return;
-    }
+// ✨ 1. [수정] props로 setSavedRoadmaps 대신 savedRoadmaps를 받습니다.
+export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail, savedRoadmaps, title = "찜한 로드맵" }) {
+  // ✨ 2. [삭제] 컴포넌트 내부의 모든 상태와 데이터 fetching 로직을 삭제합니다.
+  // const [savedRoadmaps, setSavedRoadmaps] = useState([]);
+  // const [loading, setLoading] = useState(true);
+  // const [refreshKey, setRefreshKey] = useState(0);
+  // const fetchSavedRoadmaps = useCallback(...);
+  // useEffect(...);
+  // ✨ [수정] 탭 기능을 제거하고 모든 로드맵을 하나로 표시합니다.
+  // const [activeTab, setActiveTab] = useState('all');
 
-    setLoading(true);
-    try {
-      const response = await axios.get(`${BASE_URL}/user_roadmaps/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
 
-      console.log("✅ API 응답 원본 데이터:", response.data);
 
-      const items = Array.isArray(response.data.items) ? response.data.items : response.data;
 
-      if (Array.isArray(items)) {
-        setSavedRoadmaps(items);
-        console.log("✅ 최종적으로 화면에 표시될 목록:", items);
-      } else {
-        console.error("API 응답 데이터가 배열 형식이 아닙니다:", items);
-        setSavedRoadmaps([]);
-      }
-    } catch (error) {
-      console.error("찜한 로드맵 불러오기 실패:", error);
-      setSavedRoadmaps([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    fetchSavedRoadmaps();
-  }, [fetchSavedRoadmaps]);
 
   const handleDelete = async (roadmapIdToDelete) => {
+    // ✨ [추가] 디버깅을 위해 현재 토큰 값을 콘솔에 출력합니다.
     const token = localStorage.getItem("accessToken");
+    console.log("찜하기 버튼 클릭 시 토큰:", token);
+    
     if (!token) {
       alert("로그인이 필요합니다.");
       return;
@@ -58,8 +36,9 @@ export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail }) {
       await axios.delete(`${BASE_URL}/user_roadmaps/${roadmapIdToDelete}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSavedRoadmaps(prev => prev.filter(item => item.roadmap.id !== roadmapIdToDelete));
       alert("찜이 해제되었습니다.");
+      // ✨ 3. [수정] 상태를 직접 변경하는 대신, MainContent에 변경 신호를 보냅니다.
+      window.dispatchEvent(new CustomEvent('roadmapBookmarkChanged'));
     } catch (error) {
       console.error("찜 해제 실패:", error);
       alert("찜 해제에 실패했습니다.");
@@ -73,24 +52,34 @@ export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail }) {
     }
   };
 
-  if (loading) return <p>찜한 로드맵을 불러오는 중...</p>;
+
+
+
+
+  // ✨ [수정] 부트캠프와 강의 분류를 제거하고 모든 로드맵을 하나로 표시합니다.
+  // const bootcamps = savedRoadmaps.filter(item => item.roadmap?.type === '부트캠프');
+  // const courses = savedRoadmaps.filter(item => item.roadmap?.type === '강의');
 
   return (
     <div>
       <Header $darkMode={darkMode}>
-        <FaHeart /> 찜한 로드맵 <span>{savedRoadmaps.length}개</span>
+        <FaHeart /> {title} <span>{savedRoadmaps.length}개</span>
       </Header>
+
       {savedRoadmaps.length === 0 ? (
-        <Empty>찜한 로드맵이 없습니다.</Empty>
+        <Empty>찜한 {title.includes('부트캠프') ? '부트캠프' : title.includes('강의') ? '강의' : '로드맵'}이 없습니다.</Empty>
       ) : (
         <Grid>
           {savedRoadmaps.map((item) => (
-            <Card key={item.id} $darkMode={darkMode}>
-              <Content onClick={() => handleViewDetail(item.roadmap.id)}>
-                <Company>{item.roadmap.company}</Company>
-                <Title>{item.roadmap.name}</Title>
+            <Card key={item.roadmaps_id} $darkMode={darkMode}>
+              <Content onClick={() => handleViewDetail(item.roadmap?.id)}>
+                <TypeBadge $type={item.roadmap?.type}>
+                  {item.roadmap?.type === '부트캠프' ? '🎓' : '📚'} {item.roadmap?.type}
+                </TypeBadge>
+                <Company>{item.roadmap?.company}</Company>
+                <Title>{item.roadmap?.name}</Title>
               </Content>
-              <DeleteBtn onClick={() => handleDelete(item.roadmap.id)}>
+              <DeleteBtn onClick={() => handleDelete(item.roadmaps_id)}>
                 <FaTrashAlt />
               </DeleteBtn>
             </Card>
@@ -134,4 +123,19 @@ const Company = styled.div`
 const DeleteBtn = styled.button`
   background: none; border: none; color: #aaa; cursor: pointer; font-size: 1rem; padding: 0.5rem;
   &:hover { color: #ff6b6b; }
+`;
+
+// ✨ [삭제] 사용하지 않는 탭 관련 스타일 컴포넌트들을 제거합니다.
+// const TabContainer = styled.div`...`;
+// const TabButton = styled.button`...`;
+
+const TypeBadge = styled.div`
+  display: inline-block;
+  background: ${({ $type }) => $type === '부트캠프' ? '#ffa500' : '#28a745'};
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 `;

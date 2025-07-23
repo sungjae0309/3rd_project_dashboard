@@ -1,32 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import { FaChevronDown } from "react-icons/fa";
-import axios from "axios";
-
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+import { useJobNames } from "../contexts/JobNamesContext";
 
 export default function JobSelector({ selectedJob, onJobChange, darkMode }) {
-  const [jobs, setJobs] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  // 직무 목록 가져오기
-  useEffect(() => {
-    const fetchJobs = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(`${BASE_URL}/job-skills/job-names`);
-        console.log("직무 목록 API 응답:", response.data);
-        setJobs(response.data.map(job => job.name));
-      } catch (err) {
-        console.error("직무 목록 로딩 실패:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchJobs();
-  }, []);
+  
+  // 전역 직무명 상태 사용
+  const { jobNames, loading } = useJobNames();
+  
+  // jobNames에서 name 필드만 추출
+  const jobs = jobNames.map(job => job.name);
 
   const handleJobSelect = (job) => {
     console.log("선택된 직무:", job);

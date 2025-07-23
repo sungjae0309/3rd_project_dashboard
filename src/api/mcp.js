@@ -59,6 +59,7 @@ export const deleteChatSession = async (sessionId, token) => {
     },
   });
   if (!res.ok) throw new Error("세션 삭제 실패");
+  return await res.text(); // 성공 시 "string" 반환
 };
 
 /**
@@ -114,4 +115,36 @@ export const fetchMcpResponse = async (text, userId, token) => {
   }
   const answer = await sendChatMessage(sessionId, text, token);
   return { message: answer };
+};
+
+/**
+ * 갭 분석 및 로드맵 추천 캐시 초기화
+ * DELETE /visualization/cache/clear
+ */
+export const clearVisualizationCache = async (token) => {
+  const res = await fetch(`${BASE_URL}/visualization/cache/clear`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+  if (!res.ok) throw new Error("시각화 캐시 초기화 실패");
+  return await res.text(); // 성공 시 "string" 반환
+};
+
+/**
+ * 추천 관련 캐시 초기화
+ * DELETE /recommend/cache/clear
+ */
+export const clearRecommendationCache = async (token) => {
+  const res = await fetch(`${BASE_URL}/recommend/cache/clear`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+  if (!res.ok) throw new Error("추천 캐시 초기화 실패");
+  return await res.text(); // 성공 시 "string" 반환
 };

@@ -12,7 +12,9 @@ import {
   FaBullseye,
   FaClipboardCheck,
   FaChevronLeft,
-  FaChevronRight
+  FaChevronRight,
+  FaGraduationCap,
+  FaBook
 } from "react-icons/fa";
 import { FiSearch, FiBookmark } from "react-icons/fi";
 import TodoList from "./TodoList";
@@ -28,11 +30,12 @@ import SavedJobs from "./SavedJobs";
 import AiJobRecommendation from "./AiJobRecommendation";
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
 import { useNavigate } from "react-router-dom";
-// OvercomeDetail 대신 CareerPlanFlow를 사용합니다.
-import CareerPlanFlow from './CareerPlanFlow';
+
 import axios from "axios";
 import { fetchMcpResponse } from "../api/mcp";
 import { useLocation } from "react-router-dom";
+import { useUserData } from "../contexts/UserDataContext";
+import { useRoadmap } from "../contexts/RoadmapContext";
 import SavedPage from './SavedPage';
 import AiRecsPreviewCard from "./AiRecsPreviewCard"; 
 import CareerRoadmapDetail from "./CareerRoadmapDetail";
@@ -40,7 +43,8 @@ import SavedJobDetail from "./SavedJobDetail";
 import JobSelector from "./JobSelector";
 import RecommendationReason from "./RecommendationReason";
 import GapAnalysisSection from "./GapAnalysisSection";
-// import FieldTypeSelector from "./FieldTypeSelector"; // 이 줄 제거
+import RoadmapListPage from "./RoadmapListPage";
+
 const LANDING_PAGE = "dashboard";
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
 
@@ -52,17 +56,98 @@ export default function MainContent({
 }) {
   const [selectedSession, setSelectedSession] = useState(null);
   const [savedJobs, setSavedJobs] = useState([]);
+  // ✨ [추가] savedRoadmaps 상태를 MainContent에서 관리합니다.
+  const [savedRoadmaps, setSavedRoadmaps] = useState([]);
   const [roadmapDetailId, setRoadmapDetailId] = useState(null);
   const [jobDetailId, setJobDetailId] = useState(null);
-  const [selectedJob, setSelectedJob] = useState("프론트엔드 개발자");
-  const [selectedFieldType, setSelectedFieldType] = useState("tech_stack"); // 추가
-  const [selectedReasonJob, setSelectedReasonJob] = useState(null); // 추천 이유 모달용
+  const [selectedJob, setSelectedJob] = useState("프론트엔드 개발자"); // 기본값으로 설정
+  const [selectedFieldType, setSelectedFieldType] = useState("tech_stack");
+  const [selectedReasonJob, setSelectedReasonJob] = useState(null);
+
+  // Context에서 데이터 가져오기
+  const { desiredJob, fetchDesiredJob } = useUserData();
+  const { roadmapData, fetchRoadmapData } = useRoadmap();
+
+  // Gemini가 추가한 상태들
+  const [initialRoadmapCategory, setInitialRoadmapCategory] = useState(null);
+
+  // 데이터 캐싱을 위한 상태 추가 (Context로 이동했으므로 제거)
+  // const [cachedData, setCachedData] = useState({
+  //   roadmapData: null,
+  //   lastFetchTime: null,
+  //   userId: null,
+  //   selectedJob: null
+  // });
+
+  // API 호출 상태를 추적하는 ref 추가
+  const hasInitialized = useRef(false);
 
   const [chatInit, setChatInit] = useState({ question: "", answer: "" });
-  /* ───────── 상태 ───────── */
   const token = localStorage.getItem("accessToken");
   const location = useLocation();
 
+  // useState의 초기값 함수를 사용하여 localStorage에서 userId를 가져옵니다.
+  const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
+
+  // ✨ 2. [추가] 찜한 로드맵 목록을 불러오는 함수를 정의합니다.
+  const fetchSavedRoadmaps = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(`${BASE_URL}/user_roadmaps/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (Array.isArray(response.data)) {
+        setSavedRoadmaps(response.data);
+      } else {
+        setSavedRoadmaps([]);
+      }
+    } catch (error) {
+      console.error("찜한 로드맵 목록 로딩 실패:", error);
+      setSavedRoadmaps([]);
+    }
+  };
+
+  // ✨ 3. [추가] 컴포넌트가 처음 로드될 때, 그리고 찜 상태 변경 이벤트가 발생할 때마다 목록을 새로고침합니다.
+  useEffect(() => {
+    fetchSavedRoadmaps(); // 초기 로딩
+
+    // 찜하기/찜취소 이벤트가 발생하면 목록을 다시 불러옴
+    const handleRoadmapBookmarkChange = () => {
+      console.log('🔄 MainContent에서 찜 상태 변경 이벤트 감지');
+      setTimeout(() => {
+        fetchSavedRoadmaps();
+      }, 100); // 약간의 지연을 두어 서버 상태 업데이트 대기
+    };
+
+    window.addEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
+
+    // 컴포넌트가 사라질 때 이벤트 리스너를 정리합니다.
+    return () => {
+      window.removeEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
+    };
+  }, [token]);
+
+  // 새로고침 시 홈화면으로 이동하도록 수정
+  useEffect(() => {
+    // 새로고침 시 항상 홈화면으로 이동
+    setSelectedPage("dashboard");
+    // localStorage에서 저장된 페이지 정보 제거
+    localStorage.removeItem("currentPage");
+  }, []);
+
+  // 페이지 변경 시 localStorage에 저장 - 홈화면이 아닐 때만 저장
+  useEffect(() => {
+    if (selectedPage && selectedPage !== "dashboard") {
+      localStorage.setItem("currentPage", selectedPage);
+    }
+  }, [selectedPage]);
+
+  // 페이지 이동 시 상태 초기화를 위한 useEffect 추가
+  useEffect(() => {
+    if (selectedPage !== "career-plan") {
+      setInitialRoadmapCategory(null);
+    }
+  }, [selectedPage]);
 
   useEffect(() => {
     if (location.state?.goTo === "search") {
@@ -74,9 +159,6 @@ export default function MainContent({
     }
   }, [location.state, setSelectedPage]);
   
-
-
- 
   const [mcpAnswer, setMcpAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -88,23 +170,17 @@ export default function MainContent({
   /* ▼ 예시 질문 선택 상태 */
   const [selectedExample, setSelectedExample] = useState(null);
 
-  /* ▼ 커리어 로드맵 섹션 상태(null: 메인, "analysis" | "gap" | "plan") */
-  // 이 상태는 이제 사용되지 않으므로 제거하거나 주석 처리합니다.
-  // const [roadmapSection, setRoadmapSection] = useState(null);
-
   /* (예시) 로그인 여부 */
   const isGuest = !localStorage.getItem("accessToken");
 
-
   // ➊ 상태 정의 -> 고정 프롬포트로 이동시키는 작업
-const [chatHistory, setChatHistory] = useState([]);
-const [sessionId] = useState(() => {
-  const saved = localStorage.getItem("chatSessionId");
-  const id = saved || crypto.randomUUID();
-  localStorage.setItem("chatSessionId", id);
-  return id;
-}); 
-
+  const [chatHistory, setChatHistory] = useState([]);
+  const [sessionId] = useState(() => {
+    const saved = localStorage.getItem("chatSessionId");
+    const id = saved || crypto.randomUUID();
+    localStorage.setItem("chatSessionId", id);
+    return id;
+  }); 
 
   /* ───────── 라벨/설명 ───────── */
   const pages = [
@@ -113,14 +189,12 @@ const [sessionId] = useState(() => {
     "todo",
     "search",
     "saved",
-  
     "history",
   ];
   const pageTitle = {
     "ai-jobs": "AI 추천 공고",
     "career-roadmap": "커리어 로드맵",
     todo: "To-do List",
-  
     history: "대화 이력",
   };
   const pageDesc = {
@@ -130,26 +204,17 @@ const [sessionId] = useState(() => {
     history: "이전 대화 내용을 확인하세요.",
   };
 
-
-
-
-
   const navigate = useNavigate();
 
-// 상태들
-const [searchKeyword, setSearchKeyword] = useState("");
-const [selectedTab, setSelectedTab] = useState("전체");
+  // 상태들
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [selectedTab, setSelectedTab] = useState("전체");
 
   /* ▼ 예시 질문 클릭 */
   const handleExampleClick = (prompt) => {
     setSelectedExample(prompt);
     handlePromptSubmit(prompt);
   };
-
-  // useState의 초기값 함수를 사용하여 localStorage에서 userId를 가져옵니다.
-const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
-  
-  
   
   const handlePromptSubmit = async (text) => {
     const trimmed = text.trim();
@@ -167,12 +232,68 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
     }
   };
   
-    /* ───────── 랜딩 카드(홈) ───────── */
-    function LandingCards({ setSelectedPage }) {
+  /* ───────── 랜딩 카드(홈) ───────── */
+  function LandingCards({ setSelectedPage }) {
     const handleFieldTypeChange = (fieldType) => {
       setSelectedFieldType(fieldType);
     };
 
+    // 직무 변경 시 극복 방안 데이터 새로 가져오기
+    const handleJobChange = (newJob) => {
+      setSelectedJob(newJob);
+      
+      // Context를 사용하여 로드맵 데이터 가져오기 (강제 새로고침)
+      fetchRoadmapData(newJob, true);
+    };
+
+    // 로드맵 데이터 fetch - Context 사용 (무한 루프 방지)
+    useEffect(() => {
+      if (selectedJob && !hasInitialized.current) {
+        fetchRoadmapData(selectedJob);
+        hasInitialized.current = true;
+      }
+    }, [selectedJob]); // selectedJob만 의존성으로 설정
+
+    // 사용자 관심직무 자동 설정을 위한 useEffect 수정 - 무한 루프 방지
+    useEffect(() => {
+      // 이미 초기화되었으면 다시 호출하지 않음
+      if (hasInitialized.current) {
+        return;
+      }
+
+      const token = localStorage.getItem("accessToken");
+      
+      const fetchUserDesiredJob = async () => {
+        // API 문서에 따르면 인증이 필요하지 않으므로 모든 사용자가 사용 가능
+        try {
+          console.log(' [LandingCards] Context 사용');
+          
+          // Context에서 desired job 정보 사용
+          const desiredJobData = desiredJob;
+          
+          console.log(' [LandingCards] 사용자 관심직무:', desiredJobData);
+          
+          if (desiredJobData) {
+            setSelectedJob(desiredJobData);
+            // Context에서 자동으로 로드맵 데이터를 가져옴
+          }
+        } catch (error) {
+          console.error('사용자 관심직무 가져오기 실패:', error);
+          // 에러 시에도 기본값 유지
+        } finally {
+          hasInitialized.current = true;
+        }
+      };
+
+      fetchUserDesiredJob();
+    }, [desiredJob]); // desiredJob이 변경될 때만 실행
+
+    const handleViewAllClick = (type) => {
+      setInitialRoadmapCategory(type);
+      setSelectedPage('career-plan');
+    };
+
+    // 수정된 필드 타입 라벨
     const fieldTypes = [
       { id: "tech_stack", label: "기술 스택" },
       { id: "required_skills", label: "요구 스택" },
@@ -183,40 +304,39 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
     return (
       <>
        <MainCards>
-        {/* ▼▼▼ 여기에 빠져있던 AiRecsPreviewCard 컴포넌트를 추가합니다. ▼▼▼ */}
         <AiRecsPreviewCard
           darkMode={darkMode}
           onJobDetail={setJobDetailId}
-          onShowReason={setSelectedReasonJob} // 추천 이유 모달 오픈 함수 전달
+          onShowReason={setSelectedReasonJob}
         />
-        {/* ▲▲▲ 수정 완료 ▲▲▲ */}
-       {/* ▼▼▼ AI 추천 공고 카드 레이아웃 수정 ▼▼▼ */}
        
-        <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", padding: "2.2rem 2rem 1.6rem", gap: "1.4rem", position: "relative", }}>
+        <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", padding: "1.5rem 1.8rem 1rem", gap: "0.8rem", position: "relative", minHeight: "450px", maxHeight: "450px", overflow: "hidden" }}>
             <CardIconBg><FaClipboardCheck /></CardIconBg>
-            <SectionTitle style={{ fontSize: "1.7rem" }}><HighlightBar /><span>To-do List</span></SectionTitle>
+            <SectionTitle style={{ fontSize: "1.7rem", marginTop: "-0.5rem" }}><HighlightBar /><span>To-do List</span></SectionTitle>
             <TodoList darkMode={darkMode} onPage="todo" />
-        
         </HoverCard>
         </MainCards>
         <SingleCard>
-        <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", padding: "2rem 1.5rem", minHeight: "600px" }}> {/* 높이 증가 */}
+        <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", padding: "1.8rem 1.5rem", minHeight: "480px", maxHeight: "480px", overflow: "hidden" }}>
             <HeaderRow>
               <div>
-                <SectionTitle style={{ fontSize: "1.7rem" }}><HighlightBar /><span>커리어 로드맵</span></SectionTitle>
-                <DescText>당신의 커리어 성장을 돕는 로드맵을 설계해보세요.</DescText>
+                <SectionTitle style={{ fontSize: "1.7rem", gap: '0.5rem', justifyContent: 'flex-start' }}>
+                  <HighlightBar />
+                  <span>커리어 로드맵</span>
+                </SectionTitle>
               </div>
+              {/* 모든 사용자에게 직무 선택 드롭다운 표시 */}
               <JobSelector
                 selectedJob={selectedJob}
-                onJobChange={setSelectedJob}
+                onJobChange={handleJobChange}
                 darkMode={darkMode}
               />
             </HeaderRow>
-            <CardRow>
+            <CardRow style={{ marginTop: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
             {[
                 { id: "analysis", label: "트렌드 분석", desc: "", color: "rgb(250, 243, 221)", },
                 { id: "gap", label: "갭 분석", desc: "내 이력서와 공고를 비교합니다.", color: "rgb(251, 233, 179)", },
-                { id: "plan", label: "극복 방안", desc: "부족한 부분 학습 계획을 제안합니다.", color: "rgb(255, 220, 117)", },
+                { id: "plan", label: "극복 방안", desc: "부족한 부분 학습 계획을 제안합니다.", color: "rgb(252, 224, 132)", },
             ].map((s) => (
                 s.id !== "plan" ? (
                   <MiniCard 
@@ -224,11 +344,11 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
                     $bg={s.color} 
                     $darkMode={darkMode} 
                     onClick={() => setSelectedPage("career-summary")}
-                    style={{ minHeight: "400px" }}
+                    style={{ minHeight: "370px", maxHeight: "370px", display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', padding: '1.3rem', overflow: 'hidden' }}
                   >
                     {s.id === "analysis" && (
                       <>
-                        <h3>{s.label}</h3>
+                        <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
                         <FieldTypeSelector>
                           {fieldTypes.map((fieldType) => (
                             <FieldTypeButton
@@ -244,60 +364,111 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
                             </FieldTypeButton>
                           ))}
                         </FieldTypeSelector>
-                        <MiniWordCloudPreview>
+                        <MiniWordCloudPreview style={{ justifyContent: 'center', alignItems: 'center' }}>
                           <JobKeywordAnalysis 
                             selectedJob={selectedJob} 
                             darkMode={darkMode}
                             selectedFieldType={selectedFieldType}
+                            isMainPage={true} // 메인페이지임을 표시
+                            key={`${selectedJob}-${selectedFieldType}`}
                           />
                         </MiniWordCloudPreview>
                       </>
                     )}
                     {s.id === "gap" && (
                       <>
-                        <h3>{s.label}</h3>
-                        <p>{s.desc}</p>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                          <GapAnalysisSection 
-                            selectedJob={selectedJob} 
-                            darkMode={darkMode}
-                          />
-                        </div>
+                        <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
+                        <GapAnalysisSection 
+                          selectedJob={selectedJob} 
+                          darkMode={darkMode}
+                        />
                       </>
                     )}
-                    <MiniHint style={{ marginTop: 'auto' }}>(클릭하면 상세 보기)</MiniHint>
+                    {s.id === "plan" && (
+                      <>
+                        <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
+                        <p style={{ marginBottom: '1rem', textAlign: 'center', width: '100%' }}>{s.desc}</p>
+                        <RoadmapPreview>
+                          {roadmapData.bootcamps.length > 0 && (
+                            <RoadmapItem>
+                              <RoadmapTitle>부트캠프</RoadmapTitle>
+                              <RoadmapName>{roadmapData.bootcamps[0].name}</RoadmapName>
+                              <RoadmapDuration>{roadmapData.bootcamps[0].duration}</RoadmapDuration>
+                            </RoadmapItem>
+                          )}
+                          {roadmapData.courses.length > 0 && (
+                            <RoadmapItem>
+                              <RoadmapTitle>강의</RoadmapTitle>
+                              <RoadmapName>{roadmapData.courses[0].name}</RoadmapName>
+                              <RoadmapDuration>{roadmapData.courses[0].duration}</RoadmapDuration>
+                            </RoadmapItem>
+                          )}
+                        </RoadmapPreview>
+                        <ViewAllButton onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewAllClick("plan");
+                        }}>
+                          전체 보기 →
+                        </ViewAllButton>
+                      </>
+                    )}
                   </MiniCard>
                 ) : (
-                  // 극복 방안 미니맵 카드
-                  <MiniCard
-                    key={s.id}
-                    $bg={s.color}
-                    $darkMode={darkMode}
-                    style={{ minHeight: "400px", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                  <MiniCard 
+                    key={s.id} 
+                    $bg={s.color} 
+                    $darkMode={darkMode} 
+                    onClick={() => handleViewAllClick("plan")}
+                    style={{ minHeight: "370px", maxHeight: "370px", display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', padding: '1.3rem', overflow: 'hidden' }}
                   >
-                    <h3 style={{ marginBottom: '1.2rem' }}>극복 방안 미니맵</h3>
-                    <MiniMapGrid>
-                      <MiniMapItem tabIndex={0}><MiniMapIcon>🎓</MiniMapIcon><MiniMapLabel>부트캠프</MiniMapLabel></MiniMapItem>
-                      <MiniMapItem tabIndex={0}><MiniMapIcon>📜</MiniMapIcon><MiniMapLabel>자격증</MiniMapLabel></MiniMapItem>
-                      <MiniMapItem tabIndex={0}><MiniMapIcon>💻</MiniMapIcon><MiniMapLabel>강의</MiniMapLabel></MiniMapItem>
-                    </MiniMapGrid>
-                    <MiniHint style={{ marginTop: 'auto' }}>(클릭하면 상세 보기)</MiniHint>
+                    <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
+                    <p style={{ marginBottom: '1rem', textAlign: 'center', width: '100%' }}>{s.desc}</p>
+                    <RoadmapPreview>
+                      {roadmapData.bootcamps.length > 0 && (
+                        <RoadmapItem>
+                          <RoadmapTitle>부트캠프</RoadmapTitle>
+                          <RoadmapName>{roadmapData.bootcamps[0].name}</RoadmapName>
+                          <RoadmapDuration>{roadmapData.bootcamps[0].duration}</RoadmapDuration>
+                        </RoadmapItem>
+                      )}
+                      {roadmapData.courses.length > 0 && (
+                        <RoadmapItem>
+                          <RoadmapTitle>강의</RoadmapTitle>
+                          <RoadmapName>{roadmapData.courses[0].name}</RoadmapName>
+                          <RoadmapDuration>{roadmapData.courses[0].duration}</RoadmapDuration>
+                        </RoadmapItem>
+                      )}
+                    </RoadmapPreview>
+                    <ViewAllButton onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewAllClick("plan");
+                    }}>
+                      전체 보기 →
+                    </ViewAllButton>
                   </MiniCard>
                 )
             ))}
             </CardRow>
         </HoverCard>
         </SingleCard>
-        <RowWrapper>
-        <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("search")} style={{ width: "48%", height: "230px" }}>
-            <CardIconBg><FiSearch /></CardIconBg><SectionTitle><HighlightBar /><span>공고 검색</span></SectionTitle>
-            <IntroText>키워드·지역·연차 등으로 원하는 채용을 찾아보세요.</IntroText><HintText>(클릭하면 검색 페이지로 이동)</HintText>
-        </HoverCard>
-        <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("saved")} style={{ width: "48%" }}>
-            <CardIconBg><FaHeart /></CardIconBg><SectionTitle><HighlightBar /><span>찜한 공고</span></SectionTitle>
-            <IntroText>관심 있는 공고를 한곳에 모아 관리해보세요.</IntroText><HintText>(클릭하면 찜 목록으로 이동)</HintText>
-        </HoverCard>
-        </RowWrapper>
+
+        {/* 기존 공고 검색과 찜한 공고 탭 수정 */}
+        <SingleCard>
+          <MiniMapGrid>
+            <MiniMapItem onClick={() => setSelectedPage("search")} $darkMode={darkMode}>
+              <MiniMapIcon $darkMode={darkMode}>
+                <FaSearch />
+              </MiniMapIcon>
+              <MiniMapLabel $darkMode={darkMode}>공고 검색</MiniMapLabel>
+            </MiniMapItem>
+            <MiniMapItem onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
+              <MiniMapIcon $darkMode={darkMode}>
+                <FaHeart />
+              </MiniMapIcon>
+              <MiniMapLabel $darkMode={darkMode}>찜한 공고</MiniMapLabel>
+            </MiniMapItem>
+          </MiniMapGrid>
+        </SingleCard>
       </>
     );
   }
@@ -352,10 +523,18 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
           const token = localStorage.getItem("accessToken");
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
           
-          // 사용자 이력서에서 desired_job 가져오기
-          const { data: resume } = await axios.get(`${BASE_URL}/users/me/resume`, { headers });
-          const desiredJobs = resume.desired_job || [];
-          const jobTitle = desiredJobs[0] || selectedJob; // 이력서에 없으면 선택된 직무 사용
+          // 사용자 희망 직무 정보 가져오기 (새로운 API 사용)
+          let jobTitle;
+          
+          // 로그인 여부와 관계없이 API 호출 (API가 회원/비회원을 구분해서 처리)
+          try {
+            const { data: desiredJobData } = await axios.get(`${BASE_URL}/users/desired-job`, { headers });
+            // 백엔드에서 직접 문자열로 보내주므로 data 자체가 직무명
+            jobTitle = desiredJobData;
+          } catch (err) {
+            console.warn('희망 직무 API 호출 실패, 기본값 사용:', err);
+            jobTitle = selectedJob || "프론트엔드 개발자";
+          }
           
           if (!jobTitle) {
             setError('관심 직무가 등록되어 있지 않습니다.');
@@ -475,6 +654,8 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
               darkMode={darkMode}
               savedJobs={savedJobs}
               setSavedJobs={setSavedJobs}
+              // ✨ 4. [수정] 중앙 관리 상태를 SavedPage로 내려줍니다.
+              savedRoadmaps={savedRoadmaps}
               userId={userId}
               onJobDetail={setJobDetailId}
               onRoadmapDetail={setRoadmapDetailId}
@@ -503,19 +684,43 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
           )}
           {selectedPage === "profile" && ( <MyProfile darkMode={darkMode} userId={userId} /> )}
           
+          {/* AI 추천 탭 */}
+          {selectedPage === "ai-jobs" && (
+            <AiJobRecommendation darkMode={darkMode} />
+          )}
+          
           {/* ======================= 수정된 커리어 로드맵 로직 ======================= */}
           {selectedPage === "career-summary" && (
-            <CareerRoadmapMain darkMode={darkMode} setSelectedPage={setSelectedPage} />
+            <CareerRoadmapMain 
+              darkMode={darkMode} 
+              setSelectedPage={setSelectedPage}
+              roadmapData={roadmapData}
+            />
           )}
           {selectedPage === "career-trend" && (
-            <TrendDetail darkMode={darkMode} setSelectedPage={setSelectedPage} />
+            <CareerRoadmapMain darkMode={darkMode} setSelectedPage={setSelectedPage} />
           )}
           {selectedPage === "career-gap" && (
             <GapDetail darkMode={darkMode} />
           )}
-          {selectedPage === "career-plan" && (
-            <CareerPlanFlow darkMode={darkMode} userId={userId} />
+          {selectedPage === "roadmap-bootcamps" && (
+            <RoadmapListPage 
+              darkMode={darkMode} 
+              type="부트캠프"
+              onRoadmapDetail={setRoadmapDetailId}
+              setSelectedPage={setSelectedPage}
+            />
           )}
+          {selectedPage === "roadmap-courses" && (
+            <RoadmapListPage 
+              darkMode={darkMode} 
+              type="강의"
+              onRoadmapDetail={setRoadmapDetailId}
+              setSelectedPage={setSelectedPage}
+            />
+          )}
+
+
           {/* ======================================================================= */}
           
           {selectedPage === "todo" ? (
@@ -582,15 +787,15 @@ const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
   );
 }
 
-/* ───────── 여기에 모든 기존 styled-components 코드를 그대로 붙여넣으세요 ───────── */
+// 스타일 컴포넌트들
 const fadeIn = keyframes`from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); }`;
+
 const Main = styled.main`
     flex: 1; display: flex; flex-direction: column; position: relative;
     ${({ $darkMode }) => $darkMode ? css`background: #000; color: #fff;` : css`background: #fff; color: #614f25;`}
     min-height: 100vh; padding-bottom: 200px;
 `;
 
-/* 헤더 */
 const HeaderWrapper = styled.div`
   position: relative;
   padding: 2rem 0;
@@ -602,7 +807,8 @@ const HoverCard = styled.div`
   background: #edece9;
   border-radius: 2rem;
   padding: 2rem;
-  transition: transform 0.2s ease;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   ${({ $darkMode }) => $darkMode && css`background: #2b2b2b; color: #fff;`}
   min-width: 340px;
   max-width: 100%;
@@ -613,6 +819,19 @@ const HoverCard = styled.div`
   justify-content: flex-start;
   align-items: flex-start;
   box-sizing: border-box;
+  
+  /* 간결한 호버 애니메이션 */
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    background: ${({ $darkMode }) => $darkMode ? '#333' : '#f5f5f3'};
+  }
+  
+  /* 클릭 시 애니메이션 */
+  &:active {
+    transform: translateY(-2px);
+    transition: all 0.1s ease;
+  }
 `;
 
 const CardIconBg = styled.div`
@@ -622,9 +841,16 @@ const CardIconBg = styled.div`
   font-size: 6.5rem;
   color: rgb(214, 214, 213);
   opacity: 0.5;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   ${({ $darkMode }) => $darkMode && css`color: #444;`}
+  
+  /* 간결한 호버 시 아이콘 애니메이션 */
+  ${HoverCard}:hover & {
+    opacity: 0.6;
+    color: ${({ $darkMode }) => $darkMode ? '#555' : 'rgb(200, 200, 200)'};
+  }
 `;
 
 const SectionTitle = styled.div`
@@ -634,7 +860,13 @@ const SectionTitle = styled.div`
   font-size: 1.7rem;
   font-weight: 800;
   margin-bottom: 0rem;
-  justify-content: space-between; // 우측 정렬
+  justify-content: space-between;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* 간결한 호버 시 제목 애니메이션 */
+  ${HoverCard}:hover & {
+    transform: translateX(2px);
+  }
 `;
 
 const IntroText = styled.p`
@@ -643,7 +875,13 @@ const IntroText = styled.p`
   color: #6c5f3f;
   margin-bottom: 1rem;
   margin-top: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   ${({ $darkMode }) => $darkMode && css`color: #ccc;`}
+  
+  /* 간결한 호버 시 텍스트 애니메이션 */
+  ${HoverCard}:hover & {
+    color: ${({ $darkMode }) => $darkMode ? '#ddd' : '#5a4f3f'};
+  }
 `;
 
 const HighlightBar = styled.div`
@@ -651,6 +889,14 @@ const HighlightBar = styled.div`
   height: 1.6rem;
   background: #ffc400;
   border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ✨ [추가] 호버 시 하이라이트 바 애니메이션 */
+  ${HoverCard}:hover & {
+    width: 12px;
+    background: linear-gradient(135deg, #ffc400, #ff8c00);
+    box-shadow: 0 2px 8px rgba(255, 196, 0, 0.3);
+  }
 `;
 
 const Header = styled.h1`
@@ -660,22 +906,6 @@ const Header = styled.h1`
   z-index: 1;
 `;
 
-const ToggleWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-`;
-
-const ProfileIcon = styled.div`
-  font-size: 1.8rem;
-  cursor: pointer;
-  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
-
-  &:hover {
-    color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#000")};
-  }
-`;
-
 const ProfileMenuWrapper = styled.div`
   position: absolute;
   top: 1.6rem;
@@ -683,47 +913,6 @@ const ProfileMenuWrapper = styled.div`
   z-index: 10;
 `;
 
-const Dropdown = styled.div`
-  position: absolute;
-  top: 2.4rem;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  background: ${({ $darkMode }) => ($darkMode ? "#444" : "#e9e4d7")};
-  border-radius: 0.6rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-  z-index: 10;
-  min-width: 200px;
-`;
-
-const DropdownItem = styled.div`
-  padding: 0.9rem 1rem;
-  cursor: pointer;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  white-space: nowrap;
-  line-height: 1.4;
-
-  ${({ $darkMode }) =>
-    $darkMode
-      ? css`
-          color: #eee;
-          &:hover {
-            background: #555;
-          }
-        `
-      : css`
-          color: #333;
-          &:hover {
-            background: #d8d2c2;
-          }
-        `}
-`;
-
-/* 콘텐츠 영역 */
 const ContentArea = styled.div`
   flex: 1;
   padding: 0.2rem 8rem 6rem;
@@ -734,122 +923,9 @@ const Scrollable = styled.div`
   flex: 1;
 `;
 
-/* 카드 공통 */
-const BaseCard = styled.div`
-  border-radius: 1rem;
-  padding: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  text-align: center;
-  transition: background 0.3s, border 0.3s, color 0.3s;
-  border: 2px solid transparent;
-  ${({ $darkMode }) =>
-    $darkMode
-      ? css`
-          background: #333;
-          color: #fff;
-        `
-      : css`
-          background: rgb(231, 231, 229);
-          color: #614f25;
-          box-shadow: 0 0 6px rgba(0, 0, 0, 0.05);
-        `}
-`;
-
-const RowWrapper = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
-  margin-top: 2rem;
-  flex-wrap: wrap;
-`;
-
-const BackButton = styled.button`
-  position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
-  display: flex;
-  align-items: center;
-  background: ${({ $darkMode }) => ($darkMode ? "#444" : "#eee")};
-  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  z-index: 999;
-  &:hover {
-    background: ${({ $darkMode }) => ($darkMode ? "#555" : "#ddd")};
-  }
-`;
-
-/* 프롬프트 */
-const PromptWrapper = styled.div`
-  position: fixed;
-  bottom: 2.5rem;
-  left: 60%;
-  transform: translateX(-50%);
-  z-index: 20;
-  width: 100%;
-  max-width: 800px;
-  display: flex;
-  justify-content: center;
-  height: 80px;
-`;
-
-const Prompt = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#fff")};
-  border: 2px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#eee")};
-  border-radius: 2rem;
-  padding: 1rem 1.5rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 600px;
-`;
-
-const PromptText = styled.span`
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
-  white-space: nowrap;
-`;
-
-const PromptInput = styled.input`
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  background: transparent;
-  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
-  &::placeholder {
-    color: ${({ $darkMode }) => ($darkMode ? "#888" : "#999")};
-  }
-`;
-
-const PromptButton = styled.button`
-  background: #ffc107;
-  color: #333;
-  border: none;
-  border-radius: 1rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-  &:hover {
-    background: #ffb300;
-  }
-`;
-
-/* 랜딩 카드 스타일 */
 const MainCards = styled.div`
   display: grid;
-  grid-template-columns: 3fr 1fr; // AI 추천 공고가 to-do list보다 훨씬 넓게
+  grid-template-columns: 3fr 1fr;
   gap: 2rem;
   margin-bottom: 2rem;
   align-items: stretch;
@@ -898,27 +974,68 @@ const MiniCard = styled.div`
   }
 `;
 
-const MiniCardHeader = styled.div`
+const HeaderRow = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   width: 100%;
-  margin-bottom: 0.5rem; // 간격 줄임
+  margin-bottom: 1rem;
 `;
 
-// 누락된 스타일 컴포넌트들 추가
+const DescText = styled.p`
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+  ${({ $darkMode }) => $darkMode && css`color: #ccc;`}
+`;
+
+const RowWrapper = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+`;
+
+const Card = styled.div`
+  width: 100%;
+  max-width: 1000px;
+  border-radius: 1.5rem;
+  padding: 3rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#eeeae2")};
+`;
+
+const DetailOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  overflow-y: auto;
+`;
+
+// 필터 버튼 스타일
 const FieldTypeSelector = styled.div`
   display: flex;
-  gap: 0.3rem; /* 간격 줄임 */
-  flex-wrap: nowrap; /* 줄바꿈 방지 */
-  margin-top: 0.8rem;
-  margin-bottom: 1rem;
-  justify-content: space-between; /* 버튼들을 균등하게 분배 */
-  width: 100%; /* 전체 너비 사용 */
+  gap: 0.1rem;
+  flex-wrap: nowrap;
+  margin-top: 0.2rem;
+  margin-bottom: 0.6rem;
+  justify-content: flex-start;
+  width: 90%;
+  padding-left: 0rem;
+  margin-left: -0.9rem;
 `;
 
 const FieldTypeButton = styled.button`
-  padding: 0.3rem 0.6rem; /* 패딩 줄임 */
+  padding: 0.4rem 0.6rem;
   border: 1px solid ${({ $darkMode, $active }) => 
     $active 
       ? ($darkMode ? '#4CAF50' : '#2E7D32') 
@@ -932,13 +1049,15 @@ const FieldTypeButton = styled.button`
     $active 
       ? ($darkMode ? '#fff' : '#2E7D32') 
       : ($darkMode ? '#ccc' : '#666')};
-  font-size: 0.7rem; /* 폰트 크기 줄임 */
+  font-size: 0.6rem;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
   font-weight: 500;
-  flex: 1; /* 균등하게 분배 */
-  min-width: 0; /* 최소 너비 제한 해제 */
+  flex: 1;
+  min-width: 60px;
+  overflow: visible;
+  text-overflow: clip;
 
   &:hover {
     background: ${({ $darkMode, $active }) => 
@@ -949,69 +1068,92 @@ const FieldTypeButton = styled.button`
 `;
 
 const MiniWordCloudPreview = styled.div`
-  height: 240px; /* 높이 조정 */
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.8rem;
   color: #666;
   flex: 1;
-  margin-top: 0.5rem;
+  margin-top: 0.1rem;
+  width: 100%;
+  overflow: hidden;
 `;
 
-const BlurOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 1rem;
+// 미니맵 스타일 컴포넌트들
+const MinimapSection = styled.div`
+  margin-bottom: 1.2rem;
+  width: 100%;
+`;
+
+const MinimapSectionHeader = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+  color: #333;
+  ${({ $darkMode }) => $darkMode && css`color: #fff;`}
 `;
 
-const BlurBox = styled.div`
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 1rem;
+const MinimapIcon = styled.div`
+  font-size: 1.1rem;
+  color: #ffc107;
 `;
 
-const LockIcon = styled.div`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 2rem;
-  color: #999;
+const MinimapLabel = styled.div`
+  font-size: 0.95rem;
+  font-weight: 600;
 `;
 
-const MiniHint = styled.div`
+const MinimapItemList = styled.div`
+  margin-bottom: 0.6rem;
+`;
+
+const MinimapItem = styled.div`
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 0.4rem;
+  margin-bottom: 0.4rem;
+  border-left: 3px solid #ffc107;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const MinimapItemTitle = styled.div`
   font-size: 0.8rem;
-  color: #888;
-  margin-top: 0.5rem;
-  text-align: center;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.15rem;
+  ${({ $darkMode }) => $darkMode && css`color: #fff;`}
 `;
 
-const DescText = styled.p`
-  font-size: 1rem;
+const MinimapItemCompany = styled.div`
+  font-size: 0.7rem;
   color: #666;
-  margin-bottom: 1rem;
-  line-height: 1.5;
   ${({ $darkMode }) => $darkMode && css`color: #ccc;`}
 `;
 
-const HintText = styled.div`
-  font-size: 0.85rem;
-  color: #888;
-  margin-top: 0.5rem;
-  ${({ $darkMode }) => $darkMode && css`color: #666;`}
+const MinimapViewAllButton = styled.button`
+  width: 100%;
+  padding: 0.4rem;
+  background: #ffc107;
+  color: #333;
+  border: none;
+  border-radius: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #ffb300;
+  }
 `;
 
-/* 미니 캘린더 스타일 */
+// 캘린더 스타일
 const CalendarWrapper = styled.div`
   background: #fff;
   border-radius: 1rem;
@@ -1061,7 +1203,7 @@ const EmptyDay = styled.div`
   padding: 0.3rem;
 `;
 
-/* Todo 미리보기 스타일 */
+// Todo 미리보기 스타일
 const TodoPreviewWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -1084,14 +1226,6 @@ const ProgressBar = styled.div`
   ${({ $darkMode }) => $darkMode && css`background: #444;`}
 `;
 
-const ProgressFill = styled.div`
-  width: ${({ $match }) => $match}%;
-  height: 100%;
-  background: #ffc107;
-  border-radius: 3px;
-  transition: width 0.4s ease;
-`;
-
 const BackBtn = styled.button`
   margin-top: 0.3rem;
   font-size: 0.85rem;
@@ -1104,132 +1238,6 @@ const BackBtn = styled.button`
   &:hover {
     color: #000;
   }
-`;
-
-/* 오른쪽 고정 안내 박스 */
-const Callout = styled.div`
-  position: sticky;
-  top: 1.5rem;
-  background: #fff8dc;
-  border-radius: 14px;
-  padding: 1.5rem 1.2rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  text-align: center;
-  line-height: 1.5;
-  font-size: 0.95rem;
-
-  & > p {
-    margin-bottom: 1rem;
-  }
-`;
-
-/* CTA 버튼 */
-const RoadmapBtn = styled.button`
-  background: #ffc107;
-  color: #000;
-  font-weight: 700;
-  font-size: 0.95rem;
-  border: none;
-  border-radius: 8px;
-  padding: 0.7rem 1.4rem;
-  cursor: pointer;
-  transition: background 0.25s;
-
-  &:hover {
-    background: #ffb300;
-  }
-`;
-
-const BulletText = styled.p`
-  font-size: 0.88rem;
-  color: #4d3b18;
-  margin: 0.1rem 0;
-`;
-
-const FeatureList = styled.ul`
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.8rem;
-  font-size: 0.88rem;
-  color: #4d3b18;
-  margin-bottom: 0.2rem;
-`;
-
-/* ▼ 커리어 로드맵 전용 추가 스타일 ▼ */
-const RoadmapGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  width: 850px;
-  animation: ${fadeIn} 0.5s ease;
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const Card = styled.div`
-  width: 100%;
-  max-width: 1000px;
-  border-radius: 1.5rem;
-  padding: 3rem;
-  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#eeeae2")};
-`;
-
-const DetailCard = styled(Card)`
-  height: auto;
-  width: 850px;
-  align-items: flex-start;
-  padding: 2.5rem;
-`;
-
-/* 상세 페이지 오버레이 스타일 추가 */
-const DetailOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-  overflow-y: auto;
-`;
-
-/* 새로운 스타일 추가 */
-const HeaderRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  width: 100%;
-  margin-bottom: 1rem;
-`;
-
-const FieldTypeIndicator = styled.div`
-  font-size: 0.7rem;
-  color: ${({ $darkMode }) => $darkMode ? '#666' : '#888'};
-  margin-top: 0.3rem;
-  font-weight: 500;
-`;
-
-const PageNavWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-left: auto;
-`;
-
-const PageInfo = styled.span`
-  font-size: 1.1rem;
-  color: #bfa94a;
-  font-weight: 700;
-  min-width: 56px;
-  text-align: center;
 `;
 
 const TodoProgress = styled.div`
@@ -1289,37 +1297,319 @@ const TodoEmpty = styled.div`
   font-style: italic;
 `;
 
-// 스타일 추가
+// 스타일 수정: 회색 배경과 제목 추가
 const MiniMapGrid = styled.div`
   display: flex;
-  gap: 1.5rem;
+  flex-direction: row;
+  gap: 2rem;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
+  width: 100%;
 `;
+
 const MiniMapItem = styled.div`
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #fffdfa;
-  border-radius: 1.1rem;
-  padding: 1.2rem 2.2rem;
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.08);
+  justify-content: center;
+  background: #edece9;
+  border-radius: 1.5rem;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  transition: box-shadow 0.18s, transform 0.18s, background 0.18s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 2px solid transparent;
+  min-height: 180px;
+  
   &:hover, &:focus {
-    box-shadow: 0 4px 16px rgba(255, 193, 7, 0.13);
-    background: #fffbe7;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    background: #f5f5f3;
     border: 2px solid #ffc107;
-    transform: translateY(-2px) scale(1.04);
+    transform: translateY(-4px);
   }
+  
+  ${({ $darkMode }) => $darkMode && css`
+    background: #2b2b2b;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    
+    &:hover, &:focus {
+      background: #333;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+  `}
 `;
+
 const MiniMapIcon = styled.div`
-  font-size: 2.2rem;
-  margin-bottom: 0.7rem;
+  font-size: 2.5rem;
+  color: #ffc107;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+  
+  ${MiniMapItem}:hover & {
+    transform: scale(1.1);
+    color: #ff8c00;
+  }
+  
+  ${({ $darkMode }) => $darkMode && css`
+    color: #ffc107;
+    
+    ${MiniMapItem}:hover & {
+      color: #ff8c00;
+    }
+  `}
 `;
+
 const MiniMapLabel = styled.div`
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: #333;
+  text-align: center;
+  transition: all 0.3s ease;
+  
+  ${MiniMapItem}:hover & {
+    color: #ff8c00;
+  }
+  
+  ${({ $darkMode }) => $darkMode && css`
+    color: #fff;
+    
+    ${MiniMapItem}:hover & {
+      color: #ffc107;
+    }
+  `}
 `;
+
+// 호버 팝업 스타일 수정
+const HoverPopup = styled.div.attrs(({ $top, $left }) => ({
+  style: {
+    top: `${$top}px`,
+    left: `${$left}px`,
+  },
+}))`
+  position: fixed;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  min-width: 250px;
+  max-width: 350px;
+  pointer-events: auto;
+`;
+
+const PopupHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+`;
+
+const PopupTitle = styled.div`
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+`;
+
+const PopupCloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    color: #333;
+  }
+`;
+
+const PopupItem = styled.div`
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background: #f8f9fa;
+  }
+`;
+
+const PopupItemTitle = styled.div`
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+`;
+
+const PopupItemCompany = styled.div`
+  font-size: 11px;
+  color: #666;
+`;
+
+const PopupViewAllButton = styled.button`
+  width: 100%;
+  padding: 12px 16px;
+  background: #ffc107;
+  color: #333;
+  border: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #ffb300;
+  }
+`;
+
+// 누락된 스타일드 컴포넌트들 추가
+const RoadmapPreview = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex: 1;
+`;
+
+const RoadmapItem = styled.div`
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+const RoadmapTitle = styled.div`
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+  font-weight: 500;
+`;
+
+const RoadmapName = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${props => props.$darkMode ? '#fff' : '#333'};
+  margin-bottom: 2px;
+`;
+
+const RoadmapDuration = styled.div`
+  font-size: 11px;
+  color: #666;
+`;
+
+const ViewAllButton = styled.button`
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: ${props => props.$darkMode ? '#fff' : '#333'};
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+// 직무별 더미 부트캠프 데이터 생성 함수
+const getDummyBootcamps = (job) => {
+  const bootcampData = {
+    '프론트엔드 개발자': [
+      { title: '프론트엔드 개발자 부트캠프 A', company: '코딩부트캠프' },
+      { title: 'React & Vue.js 마스터 과정', company: '프론트엔드 아카데미' }
+    ],
+    '백엔드 개발자': [
+      { title: '백엔드 개발자 부트캠프 A', company: '백엔드 아카데미' },
+      { title: 'Spring Boot & JPA 과정', company: '자바스쿨' }
+    ],
+    '자바 개발자': [
+      { title: '자바 개발자 부트캠프 A', company: '자바아카데미' },
+      { title: 'Java & Spring Framework 과정', company: '코딩스쿨' }
+    ],
+    '소프트웨어 엔지니어': [
+      { title: '소프트웨어 엔지니어 부트캠프 A', company: '소프트웨어 아카데미' },
+      { title: '풀스택 개발 과정', company: '개발자스쿨' }
+    ],
+    '안드로이드 개발자': [
+      { title: '안드로이드 개발자 부트캠프 A', company: '모바일 아카데미' },
+      { title: 'Kotlin & Android Studio 과정', company: '앱개발스쿨' }
+    ],
+    'iOS 개발자': [
+      { title: 'iOS 개발자 부트캠프 A', company: '애플 개발 아카데미' },
+      { title: 'Swift & Xcode 과정', company: 'iOS스쿨' }
+    ],
+    '데이터 분석가': [
+      { title: '데이터 분석가 부트캠프 A', company: '데이터 아카데미' },
+      { title: 'Python & Pandas 과정', company: '데이터스쿨' }
+    ],
+    'AI 엔지니어': [
+      { title: 'AI 엔지니어 부트캠프 A', company: 'AI 아카데미' },
+      { title: '머신러닝 & 딥러닝 과정', company: 'AI스쿨' }
+    ]
+  };
+  
+  return bootcampData[job] || [
+    { title: `${job} 부트캠프 A`, company: '부트캠프 회사 A' },
+    { title: `${job} 부트캠프 B`, company: '부트캠프 회사 B' }
+  ];
+};
+
+// 직무별 더미 강의 데이터 생성 함수
+const getDummyCourses = (job) => {
+  const courseData = {
+    '프론트엔드 개발자': [
+      { title: 'HTML/CSS 기초부터 마스터까지', company: '프론트엔드 강의 플랫폼' },
+      { title: 'JavaScript ES6+ 완벽 가이드', company: '코딩 강의 사이트' }
+    ],
+    '백엔드 개발자': [
+      { title: 'Java 기초부터 고급까지', company: '백엔드 강의 플랫폼' },
+      { title: 'Spring Framework 핵심 강의', company: '자바 강의 사이트' }
+    ],
+    '자바 개발자': [
+      { title: 'Java 프로그래밍 기초', company: '자바 강의 플랫폼' },
+      { title: 'Spring Boot 실전 프로젝트', company: '스프링 강의 사이트' }
+    ],
+    '소프트웨어 엔지니어': [
+      { title: '소프트웨어 설계 원리', company: '소프트웨어 강의 플랫폼' },
+      { title: '알고리즘과 자료구조', company: '알고리즘 강의 사이트' }
+    ],
+    '안드로이드 개발자': [
+      { title: 'Android Studio 기초 강의', company: '안드로이드 강의 플랫폼' },
+      { title: 'Kotlin 프로그래밍 완벽 가이드', company: '코틀린 강의 사이트' }
+    ],
+    'iOS 개발자': [
+      { title: 'Xcode 기초부터 실전까지', company: 'iOS 강의 플랫폼' },
+      { title: 'Swift 프로그래밍 마스터', company: '스위프트 강의 사이트' }
+    ],
+    '데이터 분석가': [
+      { title: 'Python 데이터 분석 기초', company: '데이터 강의 플랫폼' },
+      { title: 'Pandas & NumPy 완벽 가이드', company: '파이썬 강의 사이트' }
+    ],
+    'AI 엔지니어': [
+      { title: '머신러닝 기초 강의', company: 'AI 강의 플랫폼' },
+      { title: '딥러닝 TensorFlow 실전', company: '딥러닝 강의 사이트' }
+    ]
+  };
+  
+  return courseData[job] || [
+    { title: `${job} 온라인 강의 A`, company: '강의 플랫폼 A' },
+    { title: `${job} 온라인 강의 B`, company: '강의 플랫폼 B' }
+  ];
+};

@@ -35,139 +35,217 @@ export default function SavedJobDetail({ jobId, onBack, darkMode }) {
     fetchJobDetail();
   }, [jobId, onBack]);
 
-  if (loading) return <PageWrap><Card>⏳ 로딩 중...</Card></PageWrap>;
-  if (!job) return <PageWrap><Card>공고를 찾을 수 없습니다.</Card></PageWrap>;
+  if (loading) return (
+    <PageWrap>
+      <Card $darkMode={darkMode}>
+        <LoadingContainer>
+          <LoadingSpinner />
+          <LoadingText>공고 정보를 불러오는 중...</LoadingText>
+        </LoadingContainer>
+      </Card>
+    </PageWrap>
+  );
+  
+  if (!job) return (
+    <PageWrap>
+      <Card $darkMode={darkMode}>공고를 찾을 수 없습니다.</Card>
+    </PageWrap>
+  );
 
   return (
-    <OverlayContainer $darkMode={darkMode}>
+    <PageWrap>
       <Card $darkMode={darkMode}>
-        {/* 뒤로가기 버튼 */}
-        <BackBtn onClick={onBack} $darkMode={darkMode}>
-          ← 뒤로가기
-        </BackBtn>
-
-        {/* 유사도 배지 */}
-        {job.similarity !== null && typeof job.similarity === 'number' && (
-          <SimilarityBadge $score={job.similarity}>
-            적합도 {(job.similarity * 100).toFixed(0)}%
-          </SimilarityBadge>
-        )}
-
-        <Title $darkMode={darkMode}>{job.title}</Title>
-        <Sub $darkMode={darkMode}>{job.company_name} · {job.address}</Sub>
-
-        <Section $darkMode={darkMode}>
-          <h3>주요 업무</h3>
-          <p>{job.main_tasks || "정보 없음"}</p>
-        </Section>
-        <Section $darkMode={darkMode}>
-          <h3>자격 요건</h3>
-          <p>{job.qualifications || "정보 없음"}</p>
-        </Section>
-        <Section $darkMode={darkMode}>
-          <h3>기술 스택</h3>
-          <p>{job.tech_stack || "정보 없음"}</p>
-        </Section>
-        <Section $darkMode={darkMode}>
-          <h3>고용 형태</h3>
-          <p>{job.employment_type} · {job.applicant_type}</p>
-        </Section>
-        <Section $darkMode={darkMode}>
-          <h3>공고 기간</h3>
-          <p>{job.posting_date?.slice(0,10)} ~ {job.deadline?.slice(0,10) || "상시"}</p>
-        </Section>
+        <Header>
+          <BackButton onClick={onBack} $darkMode={darkMode}>
+            ← 뒤로가기
+          </BackButton>
+        </Header>
+        
+        <JobContent>
+          <JobTitle $darkMode={darkMode}>{job.title}</JobTitle>
+          <CompanyName $darkMode={darkMode}>{job.company_name}</CompanyName>
+          
+          <InfoSection>
+            <InfoItem>
+              <Label>주소:</Label>
+              <Value $darkMode={darkMode}>{job.address}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>고용형태:</Label>
+              <Value $darkMode={darkMode}>{job.employment_type}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>지원자 유형:</Label>
+              <Value $darkMode={darkMode}>{job.applicant_type}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>기술스택:</Label>
+              <Value $darkMode={darkMode}>{job.tech_stack}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>공고일:</Label>
+              <Value $darkMode={darkMode}>{job.posting_date?.slice(0, 10)}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>마감일:</Label>
+              <Value $darkMode={darkMode}>{job.deadline?.slice(0, 10) || "상시"}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>주요업무:</Label>
+              <Value $darkMode={darkMode}>{job.main_tasks}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>자격요건:</Label>
+              <Value $darkMode={darkMode}>{job.qualifications}</Value>
+            </InfoItem>
+            <InfoItem>
+              <Label>선호사항:</Label>
+              <Value $darkMode={darkMode}>{job.preferences}</Value>
+            </InfoItem>
+          </InfoSection>
+        </JobContent>
       </Card>
-    </OverlayContainer>
+    </PageWrap>
   );
 }
 
-/* ───── 스타일 수정 ───── */
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
+// 스타일 컴포넌트
 const PageWrap = styled.div`
-  min-height: 100vh;
-  background: ${({ $darkMode }) => $darkMode ? '#1a1a1a' : '#f8f6f1'};
-  padding: 2rem 1rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.2);
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
-`;
-
-const OverlayContainer = styled.div`
-  width: 100%;
-  max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: ${({ $darkMode }) => $darkMode ? '#1a1a1a' : '#f8f6f1'};
-  border-radius: 1rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  padding: 1rem;
 `;
 
 const Card = styled.div`
-  position: relative;
+  background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#fff")};
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+  max-height: 80vh;
+  max-width: 600px;
   width: 100%;
-  background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#fff'};
-  border-radius: 1rem;
-  padding: 2.5rem;
-  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  overflow-y: auto;
+  animation: slideInRight 0.3s ease-out;
+  margin-right: 2rem;
 `;
 
-const BackBtn = styled.button`
+const Header = styled.div`
+  margin-bottom: 1.5rem;
+`;
+
+const BackButton = styled.button`
   background: none;
   border: none;
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#555'};
-  font-size: 0.95rem;
-  margin-bottom: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
-
-  &:hover {
-    color: ${({ $darkMode }) => $darkMode ? '#fff' : '#000'};
-    background: ${({ $darkMode }) => $darkMode ? '#444' : '#f0f0f0'};
-    font-weight: bold;
-  }
-`;
-
-const Title = styled.h1`
-  font-size: 1.8rem;
-  color: #ff9900;
-  margin-bottom: 0.5rem;
-`;
-
-const Sub = styled.div`
-  font-size: 1rem;
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#555'};
-  margin-bottom: 2rem;
-`;
-
-const Section = styled.section`
-  margin-bottom: 1.5rem;
-  h3 {
-    font-size: 1.1rem;
-    color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
-    margin-bottom: 0.3rem;
-  }
-  p {
-    white-space: pre-wrap;
-    line-height: 1.6;
-    color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#444'};
-  }
-`;
-
-const SimilarityBadge = styled.div`
-  position: absolute;
-  top: 2.5rem;
-  right: 2.5rem;
-  background-color: ${({ $score }) =>
-    $score >= 0.7 ? '#2a9d8f' : $score >= 0.4 ? '#f4a261' : '#e76f51'};
-  color: white;
-  padding: 6px 12px;
-  border-radius: 16px;
+  color: #ffc107;
   font-size: 0.9rem;
-  font-weight: bold;
+  cursor: pointer;
+  padding: 0.3rem 0;
+  transition: color 0.3s ease;
+  
+  &:hover {
+    color: #ffdb4d;
+  }
+`;
+
+const JobContent = styled.div`
+  animation: fadeIn 0.3s ease-in-out;
+`;
+
+const JobTitle = styled.h1`
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
+  margin-bottom: 0.3rem;
+`;
+
+const CompanyName = styled.h2`
+  font-size: 1rem;
+  color: #ffc107;
+  margin-bottom: 1.5rem;
+`;
+
+const InfoSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#f8f9fa")};
+  border-radius: 0.6rem;
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+`;
+
+const InfoItem = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+`;
+
+const Label = styled.span`
+  font-weight: 600;
+  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
+  min-width: 80px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+`;
+
+const Value = styled.span`
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
+  line-height: 1.4;
+  word-break: break-word;
+  font-size: 0.85rem;
+`;
+
+// 애니메이션
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
+const fadeIn = keyframes`
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+`;
+
+const slideInRight = keyframes`
+  0% { 
+    opacity: 0; 
+    transform: translateX(50px) scale(0.95); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateX(0) scale(1); 
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+`;
+
+const LoadingSpinner = styled.div`
+  width: 30px;
+  height: 30px;
+  border: 2px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+  border-top: 2px solid #ffc107;
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
+  margin-bottom: 0.8rem;
+`;
+
+const LoadingText = styled.div`
+  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
+  font-size: 0.9rem;
 `;

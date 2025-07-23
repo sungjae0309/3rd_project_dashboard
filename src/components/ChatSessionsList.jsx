@@ -4,8 +4,9 @@ import {
   getMyChatSessions,
   createChatSession,
   deleteChatSession,
+  fetchChatHistory,
 } from "../api/mcp";
-import { FaPlus, FaRegClock, FaTrashAlt, FaCommentDots } from "react-icons/fa";
+import { FaRegClock, FaTrashAlt, FaCommentDots, FaCheck, FaTimes } from "react-icons/fa";
 
 // 시간 차이를 계산하여 "방금 전", "어제" 등으로 변환하는 함수
 const timeSince = (date) => {
@@ -23,36 +24,63 @@ const timeSince = (date) => {
   return "방금 전";
 };
 
-
 // ✅ 세션 정보를 표시할 새로운 카드 컴포넌트
-const SessionCard = React.memo(({ session, onSelect, onDelete, darkMode }) => {
-  // 현재 API는 ID만 반환하므로, 실제 생성 시간을 ID 기반으로 시뮬레이션합니다.
-  // 최신 ID일수록 최신 시간으로 표시됩니다.
-  const simulatedDate = new Date(Date.now() - (928 - session.id) * 3600000);
+const SessionCard = React.memo(({ 
+  session, 
+  onSelect, 
+  onDelete, 
+  darkMode, 
+  isSelectionMode, 
+  isSelected, 
+  onToggleSelect 
+}) => {
+  // 실제 생성 시간을 사용 (API에서 반환되는 경우)
+  // 만약 API에서 시간 정보가 없다면 현재 시간으로 표시
+  const sessionDate = session.created_at ? new Date(session.created_at) : new Date();
+
+  const handleCardClick = (e) => {
+    if (isSelectionMode) {
+      e.preventDefault();
+      onToggleSelect(session.id);
+    } else {
+      onSelect(session.id);
+    }
+  };
 
   return (
-    <Card onClick={() => onSelect(session.id)} $darkMode={darkMode}>
+    <Card 
+      onClick={handleCardClick} 
+      $darkMode={darkMode}
+      $isSelected={isSelected}
+      $isSelectionMode={isSelectionMode}
+    >
+      {isSelectionMode && (
+        <SelectionCheckbox $isSelected={isSelected}>
+          {isSelected ? <FaCheck /> : null}
+        </SelectionCheckbox>
+      )}
       <CardIcon $darkMode={darkMode}><FaCommentDots /></CardIcon>
-      <CardTitle>Session #{session.id}</CardTitle>
+      <CardTitle>{session.title || `Session #${session.id}`}</CardTitle>
       <CardPreview $darkMode={darkMode}>
-        이전 대화 내용을 보려면 클릭하세요.
+        대화 내용을 보려면 클릭하세요.
       </CardPreview>
       <CardFooter $darkMode={darkMode}>
         <Timestamp>
           <FaRegClock />
-          {timeSince(simulatedDate)}
+          {timeSince(sessionDate)}
         </Timestamp>
+        {!isSelectionMode && (
         <DeleteButton onClick={(e) => {
           e.stopPropagation();
           onDelete(session.id);
         }}>
           <FaTrashAlt />
         </DeleteButton>
+        )}
       </CardFooter>
     </Card>
   );
 });
-
 
 export default function ChatSessionsList({
   token,
@@ -63,13 +91,35 @@ export default function ChatSessionsList({
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSessions, setSelectedSessions] = useState(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const ids = await getMyChatSessions(token);
-      const list = ids.sort((a, b) => b - a).map((id) => ({ id }));
-      setSessions(list);
+      // 각 세션의 첫 번째 메시지를 가져와서 제목으로 사용
+      const sessionsWithTitles = await Promise.all(
+        ids.sort((a, b) => b - a).map(async (id) => {
+          try {
+            const history = await fetchChatHistory(id, token);
+            const firstMessage = history.find(msg => msg.role === "user");
+            return {
+              id,
+              title: firstMessage ? firstMessage.content.substring(0, 30) + (firstMessage.content.length > 30 ? "..." : "") : `Session #${id}`,
+              created_at: null // API에서 시간 정보가 없다면 null로 설정
+            };
+          } catch (error) {
+            console.error(`세션 ${id} 히스토리 조회 실패:`, error);
+            return {
+              id,
+              title: `Session #${id}`,
+              created_at: null
+            };
+          }
+        })
+      );
+      setSessions(sessionsWithTitles);
     } catch (e) {
       console.error("세션 목록 조회 실패:", e);
     } finally {
@@ -80,16 +130,6 @@ export default function ChatSessionsList({
   useEffect(() => {
     if (token) load();
   }, [token, load]);
-
-  const handleNew = async () => {
-    try {
-      const data = await createChatSession(token);
-      onSelect(data.id);
-      await load();
-    } catch (e) {
-      console.error("새 세션 생성 실패", e);
-    }
-  };
 
   const handleDelete = async (id) => {
     if (window.confirm(`Session #${id}를 정말 삭제하시겠습니까?`)) {
@@ -102,6 +142,40 @@ export default function ChatSessionsList({
       }
     }
   };
+
+  const handleBulkDelete = async () => {
+    const selectedIds = Array.from(selectedSessions);
+    if (selectedIds.length === 0) return;
+    
+    if (window.confirm(`선택된 ${selectedIds.length}개의 세션을 정말 삭제하시겠습니까?`)) {
+      try {
+        await Promise.all(selectedIds.map(id => deleteChatSession(id, token)));
+        if (selectedIds.includes(selectedSession)) onSelect(null);
+        setSelectedSessions(new Set());
+        setIsSelectionMode(false);
+        await load();
+      } catch (e) {
+        console.error("일괄 삭제 실패", e);
+      }
+    }
+  };
+
+  const handleToggleSelect = (sessionId) => {
+    const newSelected = new Set(selectedSessions);
+    if (newSelected.has(sessionId)) {
+      newSelected.delete(sessionId);
+    } else {
+      newSelected.add(sessionId);
+    }
+    setSelectedSessions(newSelected);
+  };
+
+  const handleSelectionModeToggle = () => {
+    if (isSelectionMode) {
+      setSelectedSessions(new Set());
+    }
+    setIsSelectionMode(!isSelectionMode);
+  };
   
   const handleFilterChange = (e) => {
     setFilter(e.target.value);
@@ -109,26 +183,41 @@ export default function ChatSessionsList({
 
   const filtered = useMemo(() => {
     const kw = filter.trim();
-    return sessions.filter((s) => String(s.id).includes(kw));
+    return sessions.filter((s) => 
+      String(s.id).includes(kw) || 
+      s.title.toLowerCase().includes(kw.toLowerCase())
+    );
   }, [sessions, filter]);
 
   return (
     <Container $darkMode={darkMode}>
       <TopBar>
         <Title>대화 이력</Title>
-        <NewBtn onClick={handleNew} $darkMode={darkMode}>
-          <FaPlus /> 새 채팅
-        </NewBtn>
+        <ActionButtons>
+          {isSelectionMode ? (
+            <>
+              <SelectionButton onClick={handleBulkDelete} $darkMode={darkMode} $isDelete>
+                <FaTrashAlt /> 삭제 ({selectedSessions.size})
+              </SelectionButton>
+              <SelectionButton onClick={handleSelectionModeToggle} $darkMode={darkMode}>
+                <FaTimes /> 취소
+              </SelectionButton>
+            </>
+          ) : (
+            <SelectionButton onClick={handleSelectionModeToggle} $darkMode={darkMode}>
+              <FaCheck /> 선택하기
+            </SelectionButton>
+          )}
+        </ActionButtons>
       </TopBar>
 
       <SearchInput
-        placeholder="세션 ID 검색"
+        placeholder="세션 ID 또는 제목 검색"
         value={filter}
         onChange={handleFilterChange}
         $darkMode={darkMode}
       />
 
-      {/* ✅ 카드 그리드 레이아웃으로 변경 */}
       <CardGrid>
         {loading && <Msg>로딩 중…</Msg>}
         {!loading && filtered.length > 0 &&
@@ -139,6 +228,9 @@ export default function ChatSessionsList({
               onSelect={onSelect}
               onDelete={handleDelete}
               darkMode={darkMode}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedSessions.has(s.id)}
+              onToggleSelect={handleToggleSelect}
             />
           ))}
         {!loading && filtered.length === 0 && <Msg>대화 이력이 없습니다.</Msg>}
@@ -172,8 +264,14 @@ const Title = styled.h3`
   color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#000")};
 `;
 
-const NewBtn = styled.button`
-  background: #5a67d8;
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const SelectionButton = styled.button`
+  background: ${({ $isDelete, $darkMode }) => 
+    $isDelete ? "#ef4444" : "#fbbf24"};
   color: white;
   border: none;
   padding: 0.6rem 1.2rem;
@@ -187,7 +285,8 @@ const NewBtn = styled.button`
   transition: all 0.2s ease-in-out;
 
   &:hover {
-    background: #434190;
+    background: ${({ $isDelete }) => 
+      $isDelete ? "#dc2626" : "#f59e0b"};
     transform: translateY(-2px);
   }
 `;
@@ -204,15 +303,15 @@ const SearchInput = styled.input`
 
   &:focus {
     outline: none;
-    border-color: #5a67d8;
-    box-shadow: 0 0 0 2px rgba(90, 103, 216, 0.3);
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
   }
 `;
 
 const CardGrid = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding-right: 10px; // for scrollbar
+  padding-right: 10px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
@@ -225,22 +324,42 @@ const Card = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#333" : "#eee")};
+  border: 2px solid ${({ $isSelected, $isSelectionMode, $darkMode }) => 
+    $isSelected ? "#fbbf24" : 
+    $isSelectionMode ? "#fbbf24" : 
+    $darkMode ? "#333" : "#eee"};
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   cursor: pointer;
   transition: all 0.2s ease-in-out;
   min-height: 150px;
+  position: relative;
 
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    border-color: #5a67d8;
+    border-color: #fbbf24;
   }
+`;
+
+const SelectionCheckbox = styled.div`
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #fbbf24;
+  border-radius: 4px;
+  background: ${({ $isSelected }) => $isSelected ? "#fbbf24" : "transparent"};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.8rem;
 `;
 
 const CardIcon = styled.div`
   font-size: 1.5rem;
-  color: ${({ $darkMode }) => ($darkMode ? "#5a67d8" : "#5a67d8")};
+  color: #fbbf24;
   margin-bottom: 0.5rem;
 `;
 
@@ -248,6 +367,7 @@ const CardTitle = styled.h4`
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
 `;
 
 const CardPreview = styled.p`
@@ -291,6 +411,6 @@ const Msg = styled.div`
   text-align: center;
   color: #666;
   width: 100%;
-  grid-column: 1 / -1; // 그리드 전체 너비 차지
+  grid-column: 1 / -1;
   padding: 2rem;
 `;

@@ -48,7 +48,7 @@ export const getFieldTypeTrend = async (jobName, fieldType, week = null) => {
 // 주간 스킬 빈도 조회 (워드클라우드용)
 export const getWeeklySkillFrequency = async (jobName, field = 'tech_stack') => {
   try {
-    const response = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency`, {
+    const response = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency_current`, {
       params: {
         job_name: jobName,
         field: field

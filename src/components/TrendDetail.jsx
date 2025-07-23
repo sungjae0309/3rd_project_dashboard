@@ -75,7 +75,7 @@ export default function TrendDetail({ darkMode = false, setSelectedPage }) {
 
         let data;
         if (visualizationType === "wordcloud") {
-          const response = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency`, {
+          const response = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency_current`, {
             params: {
               job_name: selectedJob,
               field: selectedField
@@ -126,7 +126,8 @@ export default function TrendDetail({ darkMode = false, setSelectedPage }) {
     rotations: 2,
     rotationAngles: [-90, 0],
     padding: 5,
-    deterministic: true
+    deterministic: true,
+    removeDuplicateWords: false
   };
 
   // 워드클라우드 데이터 변환
