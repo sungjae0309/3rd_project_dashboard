@@ -34,16 +34,15 @@ const SessionCard = React.memo(({
   isSelected, 
   onToggleSelect 
 }) => {
-  // 실제 생성 시간을 사용 (API에서 반환되는 경우)
-  // 만약 API에서 시간 정보가 없다면 현재 시간으로 표시
-  const sessionDate = session.created_at ? new Date(session.created_at) : new Date();
+  // API에서 받은 updated_at 사용
+  const sessionDate = session.updated_at ? new Date(session.updated_at) : new Date();
 
   const handleCardClick = (e) => {
     if (isSelectionMode) {
       e.preventDefault();
-      onToggleSelect(session.id);
+      onToggleSelect(session.id); // 그냥 session.id 그대로 사용
     } else {
-      onSelect(session.id);
+      onSelect(session.id); // 그냥 session.id 그대로 사용
     }
   };
 
@@ -97,24 +96,24 @@ export default function ChatSessionsList({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const ids = await getMyChatSessions(token);
+      const sessions = await getMyChatSessions(token);
       // 각 세션의 첫 번째 메시지를 가져와서 제목으로 사용
       const sessionsWithTitles = await Promise.all(
-        ids.sort((a, b) => b - a).map(async (id) => {
+        sessions.sort((a, b) => b.id - a.id).map(async (session) => {
           try {
-            const history = await fetchChatHistory(id, token);
+            const history = await fetchChatHistory(session.id, token);
             const firstMessage = history.find(msg => msg.role === "user");
             return {
-              id,
-              title: firstMessage ? firstMessage.content.substring(0, 30) + (firstMessage.content.length > 30 ? "..." : "") : `Session #${id}`,
-              created_at: null // API에서 시간 정보가 없다면 null로 설정
+              id: session.id,
+              title: firstMessage ? firstMessage.content.substring(0, 30) + (firstMessage.content.length > 30 ? "..." : "") : `Session #${session.id}`,
+              updated_at: session.updated_at // API에서 받은 updated_at 사용
             };
           } catch (error) {
-            console.error(`세션 ${id} 히스토리 조회 실패:`, error);
+            console.error(`세션 ${session.id} 히스토리 조회 실패:`, error);
             return {
-              id,
-              title: `Session #${id}`,
-              created_at: null
+              id: session.id,
+              title: `Session #${session.id}`,
+              updated_at: session.updated_at // API에서 받은 updated_at 사용
             };
           }
         })

@@ -77,95 +77,95 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <UserDataProvider>
-        <RoadmapProvider>
-          <JobNamesProvider>
-            <RecommendationProvider>
-              <Router>
-                <Routes>
-                  {/* 기존 라우트들 */}
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/resumeselect" element={<ResumeSelect />} />
-                  <Route path="/registernext" element={<RegisterNext />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/logout" element={<Logout />} />
-                  <Route path="/aijob" element={<Aijob />} />
-                  <Route path="/navercallback" element={<NaverCallback />} />
-                  <Route path="/aijobrecommendation" element={<AiJobRecommendation />} />
+    <UserDataProvider>
+    <RoadmapProvider>
+    <JobNamesProvider>
+    <RecommendationProvider>
+    <Router>
+      <Routes>
+        {/* 기존 라우트들 */}
+        <Route path="/register" element={<Register />} />
+        <Route path="/resumeselect" element={<ResumeSelect />} />
+        <Route path="/registernext" element={<RegisterNext />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/logout" element={<Logout />} />
+        <Route path="/aijob" element={<Aijob />} />
+        <Route path="/navercallback" element={<NaverCallback />} />
+        <Route path="/aijobrecommendation" element={<AiJobRecommendation />} />
 
-                  {/* 채팅 세션 목록(대화 이력) */}
-                  <Route
-                    path="/chathistory"
-                    element={
-                      <ChatSessionsList
-                        userId={localStorage.getItem("userId")}
-                        token={localStorage.getItem("accessToken")}
-                        darkMode={darkMode}
-                        onSelect={(id) => {
-                          // 세션 선택 시 해당 URL로 네비게이트
-                          window.location.href = `/chat/${id}`;
-                        }}
-                      />
-                    }
-                  />
+        {/* 채팅 세션 목록(대화 이력) */}
+        <Route
+          path="/chathistory"
+          element={
+            <ChatSessionsList
+              userId={localStorage.getItem("userId")}
+              token={localStorage.getItem("accessToken")}
+              darkMode={darkMode}
+              onSelect={(id) => {
+                // 세션 선택 시 해당 URL로 네비게이트
+                window.location.href = `/chat/${id}`;
+              }}
+            />
+          }
+        />
 
-                  {/* 선택된 세션의 실제 채팅 화면 */}
-                  <Route path="/chat/:sessionId" element={<ChatPageWrapper />} />
+        {/* 선택된 세션의 실제 채팅 화면 */}
+        <Route path="/chat/:sessionId" element={<ChatPageWrapper />} />
 
-                  {/* ───────── 수정된 부분 ───────── */}
-                  {/* 기존 OvercomeDetail 대신, 카테고리/목록/상세를 관리하는 CareerPlanFlow로 교체 */}
-                  <Route
-                    path="/aijob/career-summary/overcomedetail"
-                    element={<CareerPlanFlow darkMode={darkMode} />}
-                  />
-                  {/* ──────────────────────────── */}
+        {/* ───────── 수정된 부분 ───────── */}
+        {/* 기존 OvercomeDetail 대신, 카테고리/목록/상세를 관리하는 CareerPlanFlow로 교체 */}
+        <Route
+          path="/aijob/career-summary/overcomedetail"
+          element={<CareerPlanFlow darkMode={darkMode} />}
+        />
+        {/* ──────────────────────────── */}
 
-                  <Route
-                    path="/aijob/career-summary/gapdetail"
-                    element={<GapDetail />}
-                  />
-                  <Route
-                    path="/aijob/career-summary/trenddetail"
-                    element={<TrendDetail />}
-                  />
+        <Route
+          path="/aijob/career-summary/gapdetail"
+          element={<GapDetail />}
+        />
+        <Route
+          path="/aijob/career-summary/trenddetail"
+          element={<TrendDetail />}
+        />
 
-                  <Route path="/job/:id" element={<SavedJobDetail />} />
+        <Route path="/job/:id" element={<SavedJobDetail />} />
 
-                  {/* ▼▼▼ 여기에 추천 이유 페이지를 위한 라우트를 추가합니다 ▼▼▼ */}
-                  <Route 
-                    path="/recommendation-reason/:jobId" 
-                    element={<RecommendationReason darkMode={darkMode} />} 
-                  />
-                  {/* ▲▲▲ 수정 완료 ▲▲▲ */}
+        {/* ▼▼▼ 여기에 추천 이유 페이지를 위한 라우트를 추가합니다 ▼▼▼ */}
+        <Route 
+          path="/recommendation-reason/:jobId" 
+          element={<RecommendationReason darkMode={darkMode} />} 
+        />
+        {/* ▲▲▲ 수정 완료 ▲▲▲ */}
 
-                  <Route path="/roadmap/:roadmapId" element={<CareerRoadmapDetail />} />
-                  {/* ▲▲▲ 여기까지 추가 ▲▲▲ */}
+        <Route path="/roadmap/:roadmapId" element={<CareerRoadmapDetail />} />
+        {/* ▲▲▲ 여기까지 추가 ▲▲▲ */}
 
-                  {/* 홈(/) 경로에 Sidebar + MainContent 함께 렌더링 */}
-                  <Route path="/" element={
-                    <div style={{ display: 'flex' }}>
-                      <Sidebar
-                        collapsed={sidebarCollapsed}
-                        setCollapsed={setSidebarCollapsed}
-                        selectedPage={selectedPage}
-                        setSelectedPage={setSelectedPage}
-                        darkMode={darkMode}
-                      />
-                      <MainContent
-                        selectedPage={selectedPage}
-                        setSelectedPage={setSelectedPage}
-                        darkMode={darkMode}
-                      />
-                    </div>
-                  } />
-                  {/* 그 외 없는 경로는 메인으로 */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Router>
-            </RecommendationProvider>
-          </JobNamesProvider>
-        </RoadmapProvider>
-      </UserDataProvider>
+        {/* 홈(/) 경로에 Sidebar + MainContent 함께 렌더링 */}
+        <Route path="/" element={
+          <div style={{ display: 'flex' }}>
+            <Sidebar
+              collapsed={sidebarCollapsed}
+              setCollapsed={setSidebarCollapsed}
+              selectedPage={selectedPage}
+              setSelectedPage={setSelectedPage}
+              darkMode={darkMode}
+            />
+            <MainContent
+              selectedPage={selectedPage}
+              setSelectedPage={setSelectedPage}
+              darkMode={darkMode}
+            />
+          </div>
+        } />
+        {/* 그 외 없는 경로는 메인으로 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+    </RecommendationProvider>
+    </JobNamesProvider>
+    </RoadmapProvider>
+    </UserDataProvider>
     </AuthProvider>
   );
 }

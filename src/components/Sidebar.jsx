@@ -36,6 +36,35 @@ export default function Sidebar({
     { key: "roadmap-courses", label: "강의" }
   ];
 
+  // [추가] 커리어 하위 메뉴 클릭을 처리하는 함수입니다.
+  const handleCareerSubpageClick = (key) => {
+    // 모든 커리어 메뉴 클릭 시, 우선 'career-summary' 페이지를 보여줍니다.
+    setSelectedPage("career-summary");
+    
+    const url = new URL(window.location);
+
+    if (key === "career-gap") {
+      // '갭 분석'을 클릭하면 해당 id를 가진 섹션으로 스크롤합니다.
+      url.searchParams.set('section', 'gap-analysis-section');
+      window.history.pushState({}, '', url);
+      setTimeout(() => {
+        document.getElementById("gap-analysis-section")?.scrollIntoView({ behavior: "smooth" });
+      }, 200);
+    } else if (key === "career-plan") {
+      // '극복 방안'을 클릭하면 해당 id를 가진 섹션으로 스크롤합니다.
+      url.searchParams.set('section', 'overcome-plan-section');
+      window.history.pushState({}, '', url);
+      setTimeout(() => {
+        document.getElementById("overcome-plan-section")?.scrollIntoView({ behavior: "smooth" });
+      }, 200);
+    } else {
+      // '종합' 또는 '트렌드 분석'을 클릭하면 페이지 맨 위로 이동합니다.
+      url.searchParams.delete('section');
+      window.history.pushState({}, '', url);
+      setTimeout(() => window.scrollTo(0, 0), 150);
+    }
+  };
+
   return (
     <Wrapper $darkMode={darkMode} collapsed={collapsed}>
       <TopBar>
@@ -74,34 +103,8 @@ export default function Sidebar({
         {careerOpen && !collapsed &&
           careerSubpages.map(sub => (
             <SubItem
-              key={sub.key}
-              onClick={() => {
-                if (sub.key === "career-trend") {
-                  setSelectedPage("career-trend");
-                } else if (sub.key === "career-gap") {
-                  setSelectedPage("career-summary");
-                  // URL 파라미터를 추가하여 갭 분석 섹션으로 스크롤
-                  const url = new URL(window.location);
-                  url.searchParams.set('section', 'gap-analysis-section');
-                  window.history.pushState({}, '', url);
-                  setTimeout(() => {
-                    const gapSection = document.getElementById("gap-analysis-section");
-                    if (gapSection) gapSection.scrollIntoView({ behavior: "smooth" });
-                  }, 200);
-                } else if (sub.key === "career-plan") {
-                  setSelectedPage("career-summary");
-                  // URL 파라미터를 추가하여 극복 방안 섹션으로 스크롤
-                  const url = new URL(window.location);
-                  url.searchParams.set('section', 'overcome-plan-section');
-                  window.history.pushState({}, '', url);
-                  setTimeout(() => {
-                    const overcomeSection = document.getElementById("overcome-plan-section");
-                    if (overcomeSection) overcomeSection.scrollIntoView({ behavior: "smooth" });
-                  }, 200);
-                } else {
-                  setSelectedPage(sub.key);
-                }
-              }}
+              // [수정] 위에서 만든 새 함수를 여기서 호출합니다.
+              onClick={() => handleCareerSubpageClick(sub.key)}
               $darkMode={darkMode}
             >
               <Dot>•</Dot>

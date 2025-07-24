@@ -15,7 +15,9 @@ export const getMyChatSessions = async (token) => {
     },
   });
   if (!res.ok) throw new Error("세션 목록 조회 실패");
-  return await res.json();
+  const sessions = await res.json();
+  // 전체 세션 객체 반환 (id, updated_at 포함)
+  return sessions;
 };
 
 /**
@@ -64,12 +66,12 @@ export const deleteChatSession = async (sessionId, token) => {
 
 /**
  * 세션별 대화 이력 조회
- * GET /mcp_chat/history?session_id={sessionId}
+ * GET /chat/history?session_id={sessionId}
  * 반환: [{ role, content, timestamp }, …]
  */
 export const fetchChatHistory = async (sessionId, token) => {
   const res = await fetch(
-    `${BASE_URL}/mcp_chat/history?session_id=${sessionId}`,
+    `${BASE_URL}/chat/history?session_id=${sessionId}`,
     {
       headers: {
         "Content-Type": "application/json",
@@ -83,19 +85,20 @@ export const fetchChatHistory = async (sessionId, token) => {
 
 /**
  * 메시지 전송 및 답변 수신
- * POST /mcp_chat/llm/chat/
- *   body: { data: { session_id, message }, model }
+ * POST /chat/
+ *   body: { session_id, message }
  * 반환: 챗봇 답변(문자열)
  */
 export const sendChatMessage = async (sessionId, message, token) => {
-  const res = await fetch(`${BASE_URL}/mcp_chat/llm/chat/`, {
+  const res = await fetch(`${BASE_URL}/chat/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     },
     body: JSON.stringify({
-      data: { session_id: Number(sessionId), message },
+      session_id: Number(sessionId),
+      message: message,
     }),
   });
   if (!res.ok) throw new Error("메시지 전송 실패");

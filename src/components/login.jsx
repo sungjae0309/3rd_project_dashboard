@@ -4,9 +4,12 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 
+import { useAuth } from "../contexts/AuthContext"; // 
+
 export default function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ username: "", password: "" });
+  const { login } = useAuth(); 
 
   // ───── 네이버 SDK 로드 ─────
   useEffect(() => {
@@ -40,33 +43,34 @@ export default function Login() {
       const payload = new URLSearchParams();
       payload.append("username", formData.username);
       payload.append("password", formData.password);
-
+  
       const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
-
+  
       const { data: tokenRes } = await axios.post(
         `${BASE_URL}/token`,
         payload,
         { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
-
+  
       const token = tokenRes.access_token;
-      localStorage.setItem("accessToken", token);
-      localStorage.removeItem("chatSessionId"); // 세션 초기화
-
+  
       const { data: userRes } = await axios.get(
         `${BASE_URL}/users/me`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      localStorage.setItem("userId", userRes.id);
-
+  
+      // 👇 [핵심] 이 함수를 호출하여 앱의 전역 로그인 상태를 즉시 업데이트합니다.
+      login(token, userRes.id);
+  
       alert("로그인 성공!");
-      navigate("/aijob");
+      navigate("/"); // 홈으로 이동
+  
     } catch (err) {
       console.error("로그인 실패:", err.response?.data || err.message);
       alert("로그인 실패: " + (err.response?.data?.detail || err.message));
     }
   };
+  
 
   return (
     <Bg>

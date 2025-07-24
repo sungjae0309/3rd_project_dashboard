@@ -74,6 +74,23 @@ export default function ChatPage({
     }
   };
 
+  // 안전한 날짜 포맷팅 함수 추가
+  const formatTime = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "시간 정보 없음";
+      }
+      return date.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('날짜 파싱 오류:', error);
+      return "시간 정보 없음";
+    }
+  };
+
   const handlePromptSubmit = async (text) => {
     const trimmed = text.trim();
     if (!trimmed || !sessionId) return;
@@ -81,7 +98,7 @@ export default function ChatPage({
     const userMessage = {
       role: "user",
       content: trimmed,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(), // timestamp → created_at으로 변경
     };
 
     setChatHistory((h) => [...h, userMessage]);
@@ -96,7 +113,7 @@ export default function ChatPage({
           {
             role: "assistant",
             content: ans.answer || "죄송합니다. 응답을 생성할 수 없습니다.",
-            timestamp: new Date().toISOString(),
+            created_at: new Date().toISOString(), // timestamp → created_at으로 변경
           },
         ]);
       }
@@ -108,7 +125,7 @@ export default function ChatPage({
           {
             role: "assistant",
             content: "오류가 발생했습니다.",
-            timestamp: new Date().toISOString(),
+            created_at: new Date().toISOString(), // timestamp → created_at으로 변경
           },
         ]);
       }
@@ -143,7 +160,7 @@ export default function ChatPage({
           chatHistory.map((m, i) => (
             <Bubble key={i} isUser={m.role === "user"}>
               <Message>{m.content}</Message>
-              <Meta>{new Date(m.timestamp).toLocaleTimeString()}</Meta>
+              <Meta>{new Date(m.created_at).toLocaleTimeString()}</Meta>
             </Bubble>
           ))}
         {sending && chatHistory[chatHistory.length - 1]?.role === 'user' && (

@@ -1,48 +1,28 @@
-// src/components/AiRecsPreviewCard.jsx
+// src/components/AiRecsPreviewCard.jsx (최종 완성본)
 
 import React, { useState, useEffect, useRef } from 'react';
-import styled, { css, keyframes } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components'; // css, keyframes 추가
 import { FaBullseye, FaChevronLeft, FaChevronRight, FaBriefcase, FaRobot } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useRecommendations } from './RecommendationContext'; // 추가
+import { useRecommendations } from './RecommendationContext';
 
 // 환경변수 안전하게 접근
 const BASE_URL = typeof process !== 'undefined' && process.env.REACT_APP_API_BASE_URL 
   ? process.env.REACT_APP_API_BASE_URL 
   : "http://192.168.101.51:8000";
 
-// 로딩 애니메이션 정의
-const shimmer = keyframes`
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
-`;
-
-const pulse = keyframes`
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-`;
-
+// 애니메이션 정의
 const fadeIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 `;
 
-// 로딩 컴포넌트들
+// 로딩 관련 컴포넌트들
 const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -51,12 +31,10 @@ const LoadingContainer = styled.div`
   padding: 2rem;
   gap: 1rem;
 `;
-
 const LoadingSpinner = styled.div`
   display: flex;
   gap: 0.3rem;
 `;
-
 const LoadingDot = styled.div`
   width: 8px;
   height: 8px;
@@ -65,12 +43,10 @@ const LoadingDot = styled.div`
   animation: ${pulse} 1.4s ease-in-out infinite both;
   animation-delay: ${({ $delay }) => $delay};
 `;
-
 const LoadingText = styled.div`
   font-size: 0.9rem;
   color: ${({ $darkMode }) => ($darkMode ? '#ccc' : '#666')};
   text-align: center;
-  animation: ${fadeIn} 0.5s ease-out;
 `;
 
 // 회사명 표시 컴포넌트
@@ -83,7 +59,6 @@ const CompanyNameTag = styled.span`
   margin-right: 0.3rem;
   white-space: nowrap;
 `;
-
 const CompanyNameContainer = styled.div`
   flex: 3;
   text-align: left;
@@ -95,7 +70,6 @@ const CompanyNameContainer = styled.div`
   gap: 0.4rem;
   color: ${({ $darkMode }) => ($darkMode ? '#bbb' : '#555')};
 `;
-
 function CompanyNameDisplay({ company, darkMode, maxVisible = 2 }) {
     if (!company) return <div style={{ flex: 3 }}>-</div>;
     const companies = company.split(',').map(c => c.trim()).filter(Boolean);
@@ -114,194 +88,224 @@ function CompanyNameDisplay({ company, darkMode, maxVisible = 2 }) {
 
 // --- 메인 컴포넌트 ---
 export default function AiRecsPreviewCard({ darkMode, onJobDetail, onShowReason }) {
-    // RecommendationContext 사용
-    const { 
-        recommendations: contextRecommendations, 
-        isLoading: contextLoading,
-        fetchFirstPageRecommendations,
-        isFirstPage 
-    } = useRecommendations();
-    
-    // 기존 상태들 (적합도순 공고용으로만 사용)
-    const [similarityRecommendations, setSimilarityRecommendations] = useState([]);
-    const [similarityLoading, setSimilarityLoading] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [category, setCategory] = useState('ai'); // 'ai' 또는 'similarity'
-    const [isAiRecommendation, setIsAiRecommendation] = useState(true);
-    
-    // 캐시된 데이터 상태들 (적합도순 공고용)
-    const [similarityDataCache, setSimilarityDataCache] = useState({}); // 페이지별 캐시
-    
-    // AI 추천 공고 ID 목록 (적합도순에서 AI 태그 표시용)
-    const [aiRecommendedIds, setAiRecommendedIds] = useState(new Set());
+  // RecommendationContext 사용
+  const { 
+      recommendations: contextRecommendations, 
+      isLoading: contextLoading,
+      fetchFirstPageRecommendations,
+      isFirstPage 
+  } = useRecommendations();
+  
+  // 기존 상태들 (적합도순 공고용으로만 사용)
+  const [similarityRecommendations, setSimilarityRecommendations] = useState([]);
+  const [similarityLoading, setSimilarityLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [category, setCategory] = useState('ai'); // 'ai' 또는 'similarity'
+  const [isAiRecommendation, setIsAiRecommendation] = useState(true);
+  
+  // 캐시된 데이터 상태들 (적합도순 공고용)
+  const [similarityDataCache, setSimilarityDataCache] = useState({}); // 페이지별 캐시
+  
+  // AI 추천 공고 ID 목록 (적합도순에서 AI 태그 표시용)
+  const [aiRecommendedIds, setAiRecommendedIds] = useState(new Set());
 
-    const token = localStorage.getItem("accessToken");
+  // 중복 호출 방지를 위한 ref들
+  const isFetchingSimilarityRef = useRef(false);
+  const hasInitializedRef = useRef(false);
+  const lastFetchPageRef = useRef(1);
 
-    // AI 추천 공고는 Context에서 가져오기
-    useEffect(() => {
-        if (category === 'ai') {
-            if (!contextRecommendations.length && !contextLoading) {
-                console.log('🔄 [AiRecsPreviewCard] AI 추천 공고 로딩 시작');
-                fetchFirstPageRecommendations();
-            } else if (contextRecommendations.length > 0) {
-                console.log('✅ [AiRecsPreviewCard] AI 추천 공고 데이터 있음:', contextRecommendations.length);
-            }
-        }
-    }, [category, contextRecommendations.length, contextLoading]);
+      const token = localStorage.getItem("accessToken");
 
-    // AI 추천 공고 ID 목록 업데이트
-    useEffect(() => {
-        if (contextRecommendations.length > 0) {
-            const aiIds = new Set(contextRecommendations.map(job => job.id));
-            setAiRecommendedIds(aiIds);
-        }
-    }, [contextRecommendations]);
+  // AI 추천 공고는 Context에서 가져오기
+  useEffect(() => {
+      if (category === 'ai') {
+          if (!contextRecommendations.length && !contextLoading) {
+              console.log(' [AiRecsPreviewCard] AI 추천 공고 로딩 시작');
+              fetchFirstPageRecommendations();
+          } else if (contextRecommendations.length > 0) {
+              console.log('✅ [AiRecsPreviewCard] AI 추천 공고 데이터 있음:', contextRecommendations.length);
+          }
+      }
+  }, [category, contextRecommendations.length, contextLoading]);
 
-    // 현재 표시할 데이터 결정
-    const recommendations = category === 'ai' ? contextRecommendations : similarityRecommendations;
-    const isLoading = category === 'ai' ? contextLoading : similarityLoading;
+  // AI 추천 공고 ID 목록 업데이트
+  useEffect(() => {
+      if (contextRecommendations.length > 0) {
+          const aiIds = new Set(contextRecommendations.map(job => job.id));
+          setAiRecommendedIds(aiIds);
+      }
+  }, [contextRecommendations]);
+
+  // 적합도순 공고 가져오기 (페이지네이션 지원) - 완전 수정
+  const fetchSimilarityRecommendations = async (page = 1, forceFetch = false) => {
+    if (!token) return;
     
-    // 디버깅용 로그
-    console.log('🔍 [AiRecsPreviewCard] 상태 확인:', {
-        category,
-        contextRecommendations: contextRecommendations.length,
-        contextLoading,
-        similarityRecommendations: similarityRecommendations.length,
-        similarityLoading,
-        recommendations: recommendations.length,
-        isLoading
-    });
+    // 중복 호출 방지
+    if (isFetchingSimilarityRef.current) {
+        console.log(' [AiRecsPreviewCard] 적합도순 API 호출 중 - 중복 방지');
+        return;
+    }
     
-    // AI 추천 공고 데이터 상세 로그
-    if (category === 'ai' && contextRecommendations.length > 0) {
-        console.log('🔍 [AiRecsPreviewCard] AI 추천 공고 데이터:', contextRecommendations);
-        console.log('🔍 [AiRecsPreviewCard] 첫 번째 공고:', contextRecommendations[0]);
+    // 캐시가 있고 강제 새로고침이 아닌 경우 캐시 사용
+    if (!forceFetch && similarityDataCache[page]) {
+        console.log(` [AiRecsPreviewCard] 캐시된 데이터 사용 - 페이지 ${page}`);
+        setSimilarityRecommendations(similarityDataCache[page]);
+        setCurrentPage(page);
+        setIsAiRecommendation(false);
+        return;
     }
 
-    // 적합도순 공고 가져오기 (페이지네이션 지원)
-    const fetchSimilarityRecommendations = async (page = 1, forceFetch = false) => {
-        if (!token) return;
-        
-        // 캐시된 데이터가 있고 강제 새로고침이 아닌 경우
-        if (!forceFetch && similarityDataCache[page]) {
-            setSimilarityRecommendations(similarityDataCache[page]);
-            setCurrentPage(page);
-            setIsAiRecommendation(false);
-            return;
-        }
-
-        setSimilarityLoading(true);
-        try {
-            console.log(`적합도순 공고 요청 - 페이지: ${page}, 크기: 5`);
-            
-            const response = await axios.get(`${BASE_URL}/recommend/jobs/paginated`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { 
-                    page: page, // API 문서에 따르면 1부터 시작
-                    jobs_per_page: 5
-                }
-            });
-            
-            console.log('적합도순 API 응답:', response.data);
-            
-            let data = [];
-            let totalPages = 1;
-            let totalCount = 0;
-            
-            if (response.data.jobs && response.data.pagination) {
-                data = response.data.jobs;
-                totalPages = response.data.pagination.total_pages || 1;
-                totalCount = response.data.pagination.total_jobs || data.length;
-            } else if (response.data.recommended_jobs) {
-                data = response.data.recommended_jobs;
-                totalPages = response.data.total_pages || 1;
-                totalCount = response.data.total || data.length;
-            } else if (Array.isArray(response.data)) {
-                data = response.data;
-                totalPages = 1;
-                totalCount = data.length;
-            } else {
-                console.error('예상하지 못한 API 응답 구조:', response.data);
-                data = [];
-                totalPages = 1;
-                totalCount = 0;
+    console.log(` [AiRecsPreviewCard] 적합도순 공고 요청 - 페이지: ${page}, 크기: 5`);
+    isFetchingSimilarityRef.current = true;
+    setSimilarityLoading(true);
+    
+    try {
+        const response = await axios.get(`${BASE_URL}/recommend/jobs/paginated`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { 
+                page: page, // API 문서에 따르면 1부터 시작 (page + 1 제거)
+                jobs_per_page: 5
             }
-            
-            console.log(`받은 데이터: ${data.length}개, 총 페이지: ${totalPages}, 총 개수: ${totalCount}`);
-            
-            // 백엔드에서 이미 company_name을 포함해서 보내주므로 바로 사용
-            const processedData = data.map((job) => {
-                return {
-                    ...job,
-                    company: job.company_name || '회사명 없음',
-                    // AI 추천 공고에 포함되어 있는지 확인
-                    isAiRecommended: aiRecommendedIds.has(job.id)
-                };
-            });
-            
-            setSimilarityRecommendations(processedData);
-            setSimilarityDataCache(prev => ({ ...prev, [page]: processedData }));
-            setCurrentPage(page);
-            setTotalPages(totalPages);
-            setIsAiRecommendation(false);
-            
-            console.log(`적합도순 공고 로딩 완료 - 현재 페이지: ${page}, 총 페이지: ${totalPages}`);
-        } catch (error) {
-            console.error('적합도순 공고 로딩 실패:', error);
-            setSimilarityRecommendations([]);
-            setTotalPages(1);
-            setIsAiRecommendation(false);
-        } finally {
-            setSimilarityLoading(false);
-        }
-    };
-
-    // 카테고리 변경 핸들러
-    const handleCategoryChange = (newCategory) => {
-        console.log(`카테고리 변경: ${category} → ${newCategory}`);
-        setCategory(newCategory);
+        });
         
-        if (newCategory === 'ai') {
-            // AI 추천으로 변경 - Context에서 처리됨
-            if (!contextRecommendations.length && !contextLoading) {
-                fetchFirstPageRecommendations();
-            }
+        console.log(' [AiRecsPreviewCard] 적합도순 API 응답:', response.data);
+        
+        let data = [];
+        let totalPages = 1;
+        let totalCount = 0;
+        
+        if (response.data.jobs && response.data.pagination) {
+            data = response.data.jobs;
+            totalPages = response.data.pagination.total_pages || 1;
+            totalCount = response.data.pagination.total_jobs || data.length;
+        } else if (response.data.recommended_jobs) {
+            data = response.data.recommended_jobs;
+            totalPages = response.data.total_pages || 1;
+            totalCount = response.data.total || data.length;
+        } else if (Array.isArray(response.data)) {
+            data = response.data;
+            totalPages = 1;
+            totalCount = data.length;
         } else {
-            // 적합도순으로 변경 - 항상 1페이지부터 시작
-            setCurrentPage(1);
-            setSimilarityDataCache({}); // 캐시 초기화
-            fetchSimilarityRecommendations(1, true); // 강제 새로고침
+            console.error('❌ [AiRecsPreviewCard] 예상하지 못한 API 응답 구조:', response.data);
+            data = [];
+            totalPages = 1;
+            totalCount = 0;
         }
-    };
-
-    // 페이지 변경 핸들러
-    const handlePageChange = (newPage) => {
-        if (category === 'ai') return; // AI 추천은 페이징 없음
         
-        console.log(`페이지 변경 요청: ${currentPage} → ${newPage}, 총 페이지: ${totalPages}`);
+        console.log(`✅ [AiRecsPreviewCard] 받은 데이터: ${data.length}개, 총 페이지: ${totalPages}, 총 개수: ${totalCount}`);
         
-        if (newPage >= 1 && newPage <= totalPages) {
-            fetchSimilarityRecommendations(newPage);
-        } else {
-            console.warn(`페이지 범위 초과: ${newPage} (1-${totalPages})`);
-        }
-    };
-
-    // 초기 로딩 (한 번만)
-    useEffect(() => {
-        // AI 추천 공고는 Context에서 자동으로 처리됨
-        // 적합도순 캐시 초기화 (새로고침 시)
-        setSimilarityDataCache({});
-        setCurrentPage(1);
+        // 백엔드에서 이미 company_name을 포함해서 보내주므로 바로 사용
+        const processedData = data.map((job) => {
+            return {
+                ...job,
+                company: job.company_name || '회사명 없음',
+                isAiRecommended: aiRecommendedIds.has(job.id)
+            };
+        });
+        
+        // 상태 업데이트 순서 중요
+        setSimilarityRecommendations(processedData);
+        setSimilarityDataCache(prev => ({ ...prev, [page]: processedData }));
+        setCurrentPage(page);
+        setTotalPages(totalPages);
+        setIsAiRecommendation(false);
+        
+        console.log(`✅ [AiRecsPreviewCard] 적합도순 공고 로딩 완료 - 현재 페이지: ${page}, 총 페이지: ${totalPages}`);
+    } catch (error) {
+        console.error('❌ [AiRecsPreviewCard] 적합도순 공고 로딩 실패:', error);
+        setSimilarityRecommendations([]);
         setTotalPages(1);
-        setCategory('ai'); // 기본값을 AI 추천으로 설정
-    }, []); // 빈 의존성 배열로 변경하여 컴포넌트 마운트 시 한 번만 실행
+        setIsAiRecommendation(false);
+    } finally {
+        setSimilarityLoading(false);
+        isFetchingSimilarityRef.current = false;
+    }
+};
 
-    const handleTitleClick = (jobId) => { 
-        if (onJobDetail) onJobDetail(jobId); 
-    };
+// 카테고리 변경 핸들러 - 수정
+const handleCategoryChange = (newCategory) => {
+    if (category === newCategory) {
+        console.log(` [AiRecsPreviewCard] 같은 카테고리 클릭 - 무시: ${newCategory}`);
+        return;
+    }
+    
+    console.log(` [AiRecsPreviewCard] 카테고리 변경: ${category} → ${newCategory}`);
+    setCategory(newCategory);
+    
+    if (newCategory === 'ai') {
+        // AI 추천으로 변경 - Context에서 처리됨
+        if (!contextRecommendations.length && !contextLoading) {
+            fetchFirstPageRecommendations();
+        }
+    } else {
+        // 적합도순으로 변경 - 항상 1페이지부터 시작
+        console.log(' [AiRecsPreviewCard] 적합도순으로 변경 - 1페이지부터 시작');
+        setCurrentPage(1);
+        // 캐시가 있으면 사용, 없으면 API 호출
+        if (similarityDataCache[1]) {
+            console.log(' [AiRecsPreviewCard] 적합도순 1페이지 캐시 사용');
+            setSimilarityRecommendations(similarityDataCache[1]);
+            setIsAiRecommendation(false);
+        } else {
+            fetchSimilarityRecommendations(1, false);
+        }
+    }
+};
 
+// 페이지 변경 핸들러 - 수정
+const handlePageChange = (newPage) => {
+    if (category === 'ai') return; // AI 추천은 페이징 없음
+    
+    console.log(` [AiRecsPreviewCard] 페이지 변경 요청: ${currentPage} → ${newPage}, 총 페이지: ${totalPages}`);
+    
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+        console.log(` [AiRecsPreviewCard] 페이지 변경 실행: ${newPage}`);
+        fetchSimilarityRecommendations(newPage, false);
+    } else {
+        console.warn(`⚠️ [AiRecsPreviewCard] 페이지 범위 초과 또는 같은 페이지: ${newPage} (1-${totalPages})`);
+    }
+};
+
+// 초기 로딩 (한 번만) - 수정
+useEffect(() => {
+    if (hasInitializedRef.current) {
+        console.log(' [AiRecsPreviewCard] 이미 초기화됨 - 중복 실행 방지');
+        return;
+    }
+    
+    console.log(' [AiRecsPreviewCard] 컴포넌트 마운트 - 초기화');
+    // AI 추천 공고는 Context에서 자동으로 처리됨
+    setCurrentPage(1);
+    setTotalPages(1);
+    setCategory('ai'); // 기본값을 AI 추천으로 설정
+    hasInitializedRef.current = true;
+}, []); // 빈 의존성 배열로 변경하여 컴포넌트 마운트 시 한 번만 실행
+
+  const handleTitleClick = (jobId) => { 
+      if (onJobDetail) onJobDetail(jobId); 
+  };
+
+// 현재 표시할 데이터 결정
+const recommendations = category === 'ai' ? contextRecommendations : similarityRecommendations;
+const isLoading = category === 'ai' ? contextLoading : similarityLoading;
+
+// 디버깅용 로그
+console.log(' [AiRecsPreviewCard] 상태 확인:', {
+    category,
+    contextRecommendations: contextRecommendations.length,
+    contextLoading,
+    similarityRecommendations: similarityRecommendations.length,
+    similarityLoading,
+    recommendations: recommendations.length,
+    isLoading,
+    currentPage,
+    totalPages,
+    cacheKeys: Object.keys(similarityDataCache)
+});
+
+    // --- JSX 반환 (렌더링) ---
     return (
         <HoverCard $darkMode={darkMode}>
             <CardIconBg><FaBriefcase /></CardIconBg>
@@ -338,13 +342,6 @@ export default function AiRecsPreviewCard({ darkMode, onJobDetail, onShowReason 
                 </ColumnHeader>
                 <PreviewList>
                     {(() => {
-                        console.log('🔍 [AiRecsPreviewCard] 렌더링 상태:', {
-                            isLoading,
-                            recommendationsLength: recommendations.length,
-                            category,
-                            recommendations
-                        });
-                        
                         if (isLoading) {
                             return (
                                 <LoadingContainer>
@@ -360,19 +357,14 @@ export default function AiRecsPreviewCard({ darkMode, onJobDetail, onShowReason 
                             );
                         } else if (recommendations.length > 0) {
                             return recommendations.map((job, idx) => (
-                                <PreviewItem 
-                                    key={job.id || idx} 
-                                    $darkMode={darkMode}
-                                    $animate={true}
-                                >
+                                <PreviewItem key={job.id || idx} $darkMode={darkMode}>
                                     <JobTitlePreview
                                         $darkMode={darkMode}
                                         title={job.title || job.job_title || ''}
                                         onClick={() => handleTitleClick(job.id)}
                                     >
                                         <strong>{job.title || job.job_title || '제목 없음'}</strong>
-                                        {/* 적합도순에서만 AI 추천 공고와 겹치는 경우에만 간결한 AI 태그 표시 */}
-                                        {!isAiRecommendation && job.isAiRecommended && (
+                                        {category === 'similarity' && job.isAiRecommended && (
                                             <SimpleAiTag>AI</SimpleAiTag>
                                         )}
                                     </JobTitlePreview>
@@ -393,8 +385,7 @@ export default function AiRecsPreviewCard({ darkMode, onJobDetail, onShowReason 
                     })()}
                 </PreviewList>
             </ContentWrapper>
-            {/* 적합도순에서만 페이지네이션 표시 - 조건 완화 */}
-            {category === 'similarity' && (
+            {category === 'similarity' && totalPages > 1 && (
                 <PaginationWrapper $darkMode={darkMode}>
                     <PageButton 
                         onClick={() => handlePageChange(currentPage - 1)}
@@ -418,7 +409,6 @@ export default function AiRecsPreviewCard({ darkMode, onJobDetail, onShowReason 
         </HoverCard>
     );
 }
-
 // --- 스타일 정의 ---
 const HoverCard = styled.div`
   position: relative;

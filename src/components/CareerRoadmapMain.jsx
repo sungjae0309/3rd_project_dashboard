@@ -1,5 +1,5 @@
 /* ───────── src/components/CareerRoadmapMain.jsx ───────── */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { IoIosArrowUp } from "react-icons/io";
 import { 
@@ -23,15 +23,14 @@ import {
   FaBriefcase,
   FaHashtag,
   FaChartPie,
+  FaChartArea,
   FaDiversity,
   FaHistory,
   FaExternalLinkAlt
 } from "react-icons/fa";
-import WordCloud from "react-wordcloud";
-import "tippy.js/dist/tippy.css";
-import "tippy.js/animations/scale.css";
 import axios from "axios";
-
+import JobKeywordAnalysis from "./JobKeywordAnalysis";
+import DailySkillTrend from "./DailySkillTrend";
 // 메인 화면과 동일한 API 주소 사용
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
 
@@ -54,12 +53,21 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   const [endWeek, setEndWeek] = useState("");
   const [year, setYear] = useState("");
   
+  // 사용 가능한 날짜/주차/연도 상태 추가
+  const [availableDates, setAvailableDates] = useState([]);
+  const [availableWeeks, setAvailableWeeks] = useState([]);
+  const [availableYears, setAvailableYears] = useState([]);
+  
   // 주간 비교 팝업 상태
   const [showWeeklyComparisonPopup, setShowWeeklyComparisonPopup] = useState(false);
   const [comparisonData, setComparisonData] = useState(null);
   const [selectedComparisonType, setSelectedComparisonType] = useState("all_skills");
 
   const [showGapInsightsPopup, setShowGapInsightsPopup] = useState(false);
+
+
+  // ▼▼▼ 여기에 새 상태 추가 ▼▼▼
+  const [isTrendResultVisible, setIsTrendResultVisible] = useState(false);
   
   // 로드맵 상세 팝업 상태
   const [showRoadmapDetail, setShowRoadmapDetail] = useState(false);
@@ -90,8 +98,54 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   // ✨ [추가] 찜한 로드맵 ID 목록을 저장할 상태
   const [savedRoadmapIds, setSavedRoadmapIds] = useState(new Set());
 
-  // 초기화 완료 상태 추가
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // 초기화 완료 상태 추가
+  
+  const trendStats = useMemo(() => {
+    if (!skillData || skillData.length === 0) {
+        return {
+            uniqueSkills: 0,
+            peakSkill: { skill: '없음', count: 0 },
+            topMover: { skill: '없음', increase: 0 },
+            avgFrequency: 0
+        };
+    }
+
+    // 1. 분석 기술 수
+    const uniqueSkills = new Set(skillData.map(d => d.skill)).size;
+
+    // 2. 최고점 기술
+    const peakSkill = skillData.reduce((max, item) => 
+        (item.count > max.count ? item : max), 
+        skillData[0]
+    );
+
+    // 3. 상승세 기술
+    const skillsMap = new Map();
+    skillData.forEach(d => {
+        if (!skillsMap.has(d.skill)) skillsMap.set(d.skill, []);
+        skillsMap.get(d.skill).push({ date: new Date(d.date), count: d.count });
+    });
+
+    let topMover = { skill: '없음', increase: -Infinity };
+    skillsMap.forEach((points, skill) => {
+        if (points.length > 1) {
+            points.sort((a, b) => a.date - b.date);
+            const increase = points[points.length - 1].count - points[0].count;
+            if (increase > topMover.increase) {
+                topMover = { skill, increase };
+            }
+        }
+    });
+
+    // 4. 평균 빈도수
+    const totalCount = skillData.reduce((sum, item) => sum + item.count, 0);
+    const avgFrequency = Math.round(totalCount / skillData.length);
+
+    return { uniqueSkills, peakSkill, topMover, avgFrequency };
+
+}, [skillData]);
 
   // URL 파라미터를 통해 특정 섹션으로 스크롤하는 기능
   useEffect(() => {
@@ -160,6 +214,29 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     };
   }, []);
 
+  // 사용 가능한 날짜/주차/연도 가져오기
+  useEffect(() => {
+    const fetchAvailableDates = async () => {
+      try {
+        const response = await axios.get(`${BASE_URL}/visualization/stats/available_dates`);
+        const { dates, weeks, years } = response.data;
+        
+        setAvailableDates(dates || []);
+        setAvailableWeeks(weeks || []);
+        setAvailableYears(years || []);
+        
+        console.log('✅ 사용 가능한 날짜/주차/연도:', { dates, weeks, years });
+      } catch (error) {
+        console.warn('사용 가능한 날짜/주차/연도 조회 실패:', error);
+        // 기본값 설정
+        setAvailableWeeks(Array.from({length: 53}, (_, i) => i + 1));
+        setAvailableYears([2025, 2026]);
+      }
+    };
+
+    fetchAvailableDates();
+  }, []);
+
   // ✨ [추가] 찜한 로드맵 ID 목록 불러오기
   useEffect(() => {
     const fetchSavedRoadmapIds = async () => {
@@ -209,129 +286,101 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     };
   }, []);
 
-  // 추천 로드맵 fetch - 초기화 완료 후에만 실행
   useEffect(() => {
-    if (isInitialized && selectedTrendJob) {
+    if (isInitialized && selectedGapJob) {
       fetchRecommendedRoadmaps();
     }
-  }, [isInitialized, selectedTrendJob]);
+  }, [isInitialized, selectedGapJob]);
 
-  // 3. 스킬 데이터 fetch (selectedTrendJob, selectedField 기준) - 초기화 완료 후에만 실행
+
+
+  // 3. 스킬 데이터 fetch (weekly_comparison과 trend만 처리, wordcloud는 JobKeywordAnalysis에서 처리)
   useEffect(() => {
     if (!isInitialized || !selectedTrendJob) return;
     
+    // wordcloud는 JobKeywordAnalysis에서 처리하므로 스킵
+    if (visualizationType === "wordcloud"|| visualizationType === "trend") {
+      return;
+    }
+    
     console.log("트렌드 데이터 요청 - 직무:", selectedTrendJob, "필드:", selectedField);
 
-    let isMounted = true;
-    
     const fetchSkillData = async () => {
-      if (!selectedTrendJob) return;
+      // visualizationType이 weekly_comparison일 때, 주차/연도 미입력 시 조기 반환
+      if (visualizationType === "weekly_comparison" && (!startWeek || !endWeek || !year)) {
+        setSkillData([]); // 데이터를 비워 입력 화면을 표시
+        return;
+      }
       
       try {
         setLoading(true);
         setError(null);
 
-        let apiResponse;
-        let data;
+        let endpoint;
+        const params = { job_name: selectedTrendJob, field: selectedField };
 
-        if (visualizationType === "wordcloud") {
-          apiResponse = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency_current`, {
-            params: {
-              job_name: selectedTrendJob,
-              field: selectedField
-            }
-          });
-          data = apiResponse.data;
+        if (visualizationType === "weekly_comparison") {
+          endpoint = `${BASE_URL}/visualization/weekly_skill_frequency_comparison`;
+          params.week1 = parseInt(startWeek);
+          params.week2 = parseInt(endWeek);
+          params.year = parseInt(year);
         } else if (visualizationType === "trend") {
-          apiResponse = await axios.get(`${BASE_URL}/stats/trend/${selectedTrendJob}`, {
-            params: {
-              field_type: selectedField,
-              week: 29
-            }
-          });
-          data = apiResponse.data;
-        } else if (visualizationType === "weekly_comparison") {
-          if (!startWeek || !endWeek || !year) {
-            setSkillData([]);
-            setLoading(false);
-            return;
-          }
-          
-          console.log('주간 비교 API 호출:', {
-            job_name: selectedTrendJob,
-            field: selectedField,
-            start_week: startWeek,
-            end_week: endWeek,
-            year: year
-          });
-          
-          apiResponse = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency_comparison`, {
-            params: {
-              job_name: selectedTrendJob,
-              field: selectedField,
-              week1: parseInt(startWeek),
-              week2: parseInt(endWeek),
-              year: parseInt(year)
-            }
-          });
-          data = apiResponse.data;
-        } else {
-          apiResponse = await axios.get(`${BASE_URL}/stats/weekly/${selectedTrendJob}`, {
-            params: { week: 29 }
-          });
-          data = apiResponse.data;
+          // 새로운 엔드포인트 사용
+          endpoint = `${BASE_URL}/visualization/weekly_skill_frequency`;
+          params.start_week = 29; // 예시 주차
+          params.end_week = 30; // 예시 주차
+          params.year = 2025; // 예시 연도
+        } else { // 'wordcloud' 또는 기타
+          endpoint = `${BASE_URL}/stats/trend/${selectedTrendJob}`;
+          params.field_type = selectedField;
+          params.week = 29; // 예시 주차
         }
-
-        console.log("✅ [fetchSkillData] API 응답:", data);
-        console.log("✅ [fetchSkillData] 응답 타입:", typeof data);
-        console.log("✅ [fetchSkillData] 배열 여부:", Array.isArray(data));
-        console.log("✅ [fetchSkillData] 데이터 길이:", data?.length);
-
-        if (!data || !Array.isArray(data) || data.length === 0) {
-          console.log("❌ [fetchSkillData] 데이터가 없거나 유효하지 않음");
-          setError("해당 직무의 데이터가 없습니다.");
-          setSkillData([]);
-          return;
-        }
-
-        if (isMounted) {
-          const processedData = processApiResponse(data, visualizationType);
-          console.log("✅ [fetchSkillData] 처리된 데이터:", processedData);
-          setSkillData(processedData);
-        }
-
-      } catch (error) {
-        console.error('❌ [fetchSkillData] 스킬 데이터 조회 실패:', error);
-        console.error('❌ [fetchSkillData] 에러 응답:', error.response?.data);
         
-        if (isMounted) {
-          if (error.response?.status === 404) {
-            setError("해당 직무의 데이터가 없습니다. 다른 직무를 선택해보세요.");
-          } else if (error.response?.status === 500) {
-            setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-          } else if (error.response?.status === 401) {
-            setError("인증이 필요합니다.");
-          } else if (error.response?.status === 400) {
-            setError("잘못된 요청입니다. 파라미터를 확인해주세요.");
+        const response = await axios.get(endpoint, { params });
+        const rawData = response.data;
+
+        console.log('🔍 [fetchSkillData] API 응답 데이터:', rawData);
+
+        // [수정] 데이터 처리 로직을 더 견고하게 만듭니다.
+        const processedData = processApiResponse(rawData, visualizationType);
+        
+        if (visualizationType === "weekly_comparison") {
+          // weekly_comparison 시각화에서는 전체 응답 데이터를 comparisonData에 저장
+          if (rawData && typeof rawData === 'object' && rawData.all_skills && rawData.all_skills.length > 0) {
+            console.log('✅ [fetchSkillData] weekly_comparison 전체 데이터 저장:', rawData);
+            setComparisonData(rawData);
+            setSkillData(processedData);
+            setError(null);
           } else {
-            setError("데이터를 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
+            console.log('⚠️ [fetchSkillData] weekly_comparison 시각화에서 데이터 없음, 빈 배열 설정');
+            console.log('🔍 [fetchSkillData] rawData 구조:', rawData);
+            setSkillData([]);
+            setComparisonData(null);
           }
-          
+        } else if (processedData && processedData.length > 0) {
+          console.log('✅ [fetchSkillData] 유효한 데이터 설정:', processedData);
+          console.log('✅ [fetchSkillData] 데이터 개수:', processedData.length);
+          setSkillData(processedData);
+          setError(null); // 성공 시 에러 상태 초기화
+        } else {
+          // 데이터가 없을 경우 처리 - 더미데이터 사용하지 않음
+          console.log('⚠️ [fetchSkillData] 데이터 없음, 빈 배열 설정');
           setSkillData([]);
         }
+      } catch (error) {
+        console.error('❌ 스킬 데이터 조회 실패:', error);
+        // API 호출 실패 시 처리 - 더미데이터 사용하지 않음
+        console.log('⚠️ [fetchSkillData] API 실패, 빈 배열 설정');
+        setSkillData([]);
+        setComparisonData(null);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
     fetchSkillData();
-
-    return () => {
-      isMounted = false;
-    };
   }, [isInitialized, selectedTrendJob, selectedField, visualizationType, startWeek, endWeek, year]);
+
 
   // 4. 갭 분석 데이터 fetch (selectedGapJob 기준) - 초기화 완료 후에만 실행
   const fetchGapAnalysis = async () => {
@@ -400,38 +449,38 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
       console.error('❌ [CareerRoadmapMain] 캐시 상태 조회 실패:', err);
     }
   };
-
-  // 추천 로드맵 가져오기 - 캐시 활용으로 수정
-  const fetchRecommendedRoadmaps = async () => {
-    setRecommendationLoading(true);
-    try {
-      const token = localStorage.getItem("accessToken");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+// ✅ 수정 후 코드 2: fetchRecommendedRoadmaps 함수
+const fetchRecommendedRoadmaps = async () => {
+  setRecommendationLoading(true);
+  try {
+    const token = localStorage.getItem("accessToken");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    
+    const response = await axios.get(`${BASE_URL}/visualization/roadmap_recommendations`, { 
+      params: { 
+        // [수정] category 값을 selectedTrendJob -> selectedGapJob으로 변경합니다.
+        // 이제 '갭 분석'에서 선택한 직무를 기준으로 추천 로드맵을 요청합니다.
+        category: selectedGapJob,
+        limit: 10,
+        force_refresh: false
+      },
+      headers 
+    });
+    
+    console.log('✅ [CareerRoadmapMain] 로드맵 추천 완료 (직무 기준):', selectedGapJob, response.data);
+    
+    const bootcamps = response.data.filter(item => item.type === '부트캠프').slice(0, 5);
+    const courses = response.data.filter(item => item.type === '강의').slice(0, 5);
+    
+    setRecommendedRoadmaps({ bootcamps, courses });
+  } catch (error) {
+    console.error('❌ [CareerRoadmapMain] 로드맵 추천 실패:', error);
+    setRecommendedRoadmaps({ bootcamps: [], courses: [] });
+  } finally {
+    setRecommendationLoading(false);
+  }
+};
       
-      // 캐시를 활용한 로드맵 추천 호출
-      const response = await axios.get(`${BASE_URL}/visualization/roadmap_recommendations`, { 
-        params: { 
-          category: selectedTrendJob,  // 직무별로 필터링
-          limit: 10,
-          force_refresh: false  // 캐시 우선 사용
-        },
-        headers 
-      });
-      
-      console.log('✅ [CareerRoadmapMain] 로드맵 추천 완료 (캐시 활용):', response.data);
-      
-      // 부트캠프와 강의로 분류
-      const bootcamps = response.data.filter(item => item.type === '부트캠프').slice(0, 5);
-      const courses = response.data.filter(item => item.type === '강의').slice(0, 5);
-      
-      setRecommendedRoadmaps({ bootcamps, courses });
-    } catch (error) {
-      console.error('❌ [CareerRoadmapMain] 로드맵 추천 실패:', error);
-      setRecommendedRoadmaps({ bootcamps: [], courses: [] });
-    } finally {
-      setRecommendationLoading(false);
-    }
-  };
 
   // 특정 로드맵 상세 조회
   const fetchRoadmapDetail = async (roadmapId) => {
@@ -525,6 +574,36 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   };
 
   // 메인 화면과 동일한 데이터 처리 방식
+  // 샘플 데이터 생성 함수 추가
+  const generateSampleData = (type) => {
+    const baseSkills = [
+      { skill: "Python", count: 45, trend: 'up' },
+      { skill: "Java", count: 38, trend: 'stable' },
+      { skill: "SQL", count: 32, trend: 'down' },
+      { skill: "React", count: 30, trend: 'up' },
+      { skill: "AWS", count: 25, trend: 'stable' },
+      { skill: "Spring", count: 22, trend: 'stable' },
+      { skill: "JavaScript", count: 28, trend: 'up' },
+      { skill: "Docker", count: 20, trend: 'up' },
+      { skill: "Kubernetes", count: 18, trend: 'up' },
+      { skill: "Node.js", count: 15, trend: 'stable' }
+    ];
+
+    if (type === "wordcloud") {
+      return baseSkills.map(item => ({
+        ...item,
+        text: item.skill,
+        value: item.count,
+        week: 29,
+        date: new Date().toISOString().split('T')[0],
+        year: new Date().getFullYear(),
+        week_day: `29.${(new Date().getFullYear() % 100)}`
+      }));
+    } else {
+      return baseSkills;
+    }
+  };
+
   const processApiResponse = (data, type) => {
     console.log('🔍 [processApiResponse] 입력 데이터:', data);
     console.log('🔍 [processApiResponse] 타입:', type);
@@ -535,97 +614,165 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     }
 
     if (type === "wordcloud") {
-      // 워드클라우드용 데이터 처리 - API 응답 구조에 맞게 수정
+      // 워드클라우드용 데이터 처리 - API 문서 구조에 맞게 수정
       const processedData = data.map(item => {
-        // API 응답에서 skill과 count 필드 추출
-        const skill = item.skill || item.skill_name || '';
-        const count = item.count || item.frequency || 0;
+        if (!item || typeof item !== 'object') {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 아이템:', item);
+          return null;
+        }
+        
+        // API 문서 구조: {week, date, skill, count}
+        const skill = item.skill || '';
+        const count = parseInt(item.count || 0);
+        const week = item.week;
+        const date = item.date;
+        
+        // 유효하지 않은 데이터는 제외
+        if (!skill || typeof skill !== 'string' || skill.trim() === '' || count <= 0) {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 skill/count:', { skill, count });
+          return null;
+        }
+        
+        // date에서 year 추출
+        const year = date ? new Date(date).getFullYear() : new Date().getFullYear();
+        const weekNum = week || 29;
         
         // 트렌드 계산 (이전 데이터가 없으면 stable로 설정)
-        const trend = calculateTrend(count, item.previous_count || 0);
+        const trend = calculateTrend(count, parseInt(item.previous_count || 0));
         
         return {
-          skill: skill,
+          skill: skill.trim(),
           count: count,
-          year: item.year,
-          week: item.week,
-          week_day: item.week ? `${item.week}.${(item.year || new Date().getFullYear()) % 100}` : '',
+          year: year,
+          week: weekNum,
+          week_day: `${weekNum}.${year % 100}`,
           trend: trend
         };
-      }).filter(item => item.skill && item.count > 0); // 빈 데이터 필터링
+      }).filter(item => item !== null); // null 아이템 필터링
       
       console.log('✅ [processApiResponse] 워드클라우드 처리 결과:', processedData);
       return processedData;
       
     } else if (type === "trend") {
-      const processedData = data.map(item => {
-        const trend = calculateTrend(item.count, item.previous_count || 0);
-        return {
-          skill: item.skill || item.skill_name,
-          count: item.count || item.frequency,
-          week_day: item.week_day,
-          date: item.date,
-          trend: trend
-        };
-      });
+      // 새로운 엔드포인트 응답 구조: [{week, date, skill, count}, ...]
+      console.log('🔍 [processApiResponse] trend 원본 데이터:', data);
       
-      console.log('✅ [processApiResponse] 트렌드 처리 결과:', processedData);
+      if (!data || !Array.isArray(data)) {
+        console.log('❌ [processApiResponse] trend 데이터가 없거나 배열이 아님');
+        return [];
+      }
+
+      // 스킬별로 그룹화하고 총 count 계산
+      const skillCounts = {};
+      data.forEach(item => {
+        if (!item || typeof item !== 'object') {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 trend 아이템:', item);
+          return;
+        }
+        
+        const skill = item.skill || '';
+        const count = parseInt(item.count || 0);
+        
+        if (!skill || typeof skill !== 'string' || skill.trim() === '' || count <= 0) {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 skill/count:', { skill, count });
+          return;
+        }
+        
+        const skillKey = skill.trim();
+        if (skillCounts[skillKey]) {
+          skillCounts[skillKey] += count;
+        } else {
+          skillCounts[skillKey] = count;
+        }
+      });
+
+      // count 기준으로 정렬하고 상위 12개 선택
+      const sortedSkills = Object.entries(skillCounts)
+        .map(([skill, count]) => ({ skill, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 12);
+
+      // 트렌드 계산 (간단히 stable로 설정, 실제로는 이전 데이터와 비교 필요)
+      const processedData = sortedSkills.map((item, index) => ({
+        skill: item.skill,
+        count: item.count,
+        trend: "stable", // 실제 트렌드 계산은 별도 로직 필요
+        rank: index + 1
+      }));
+
+      console.log('✅ [processApiResponse] trend 처리 결과:', processedData);
       return processedData;
       
     } else if (type === "weekly_comparison") {
-      // FastAPI docs 응답 구조: [{year, week, skill, count}]
-      const weeklyData = {};
+      // API 문서 응답 구조: {all_skills: [...], biggest_difference: {...}, ...}
+      console.log('🔍 [processApiResponse] weekly_comparison 원본 데이터:', data);
       
-      data.forEach(item => {
-        if (!weeklyData[item.week]) {
-          weeklyData[item.week] = [];
+      if (!data || typeof data !== 'object') {
+        console.log('❌ [processApiResponse] weekly_comparison 데이터가 객체가 아님');
+        return [];
         }
-        weeklyData[item.week].push({
-          skill: item.skill,
-          count: item.count,
-          week: item.week,
-          year: item.year
-        });
-      });
-
-      const skillComparison = {};
-      Object.keys(weeklyData).forEach(week => {
-        weeklyData[week].forEach(item => {
-          if (!skillComparison[item.skill]) {
-            skillComparison[item.skill] = {};
-          }
-          skillComparison[item.skill][week] = item.count;
-        });
-      });
-
-      const processedData = Object.keys(skillComparison).map(skill => {
-        const weeks = Object.keys(skillComparison[skill]).sort();
-        const beforeCount = skillComparison[skill][weeks[0]] || 0;
-        const afterCount = skillComparison[skill][weeks[weeks.length - 1]] || 0;
+        
+      // all_skills 배열이 있는지 확인
+      if (!data.all_skills || !Array.isArray(data.all_skills)) {
+        console.log('❌ [processApiResponse] all_skills 배열이 없음:', data);
+        console.log('🔍 [processApiResponse] data.all_skills:', data.all_skills);
+        console.log('🔍 [processApiResponse] data.all_skills 타입:', typeof data.all_skills);
+        return [];
+      }
+      
+      const processedData = data.all_skills.map(item => {
+        if (!item || typeof item !== 'object') {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 all_skills 아이템:', item);
+          return null;
+        }
+        
+        const skill = item.skill || '';
+        const week1Count = parseInt(item.week1_count || 0);
+        const week2Count = parseInt(item.week2_count || 0);
+        const difference = parseInt(item.difference || 0);
+        const percentageChange = parseFloat(item.percentage_change || 0);
+        
+        if (!skill || typeof skill !== 'string' || skill.trim() === '') {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 skill:', { skill, week1Count, week2Count });
+          return null;
+        }
         
         return {
-          skill: skill,
-          beforeCount: beforeCount,
-          afterCount: afterCount,
-          change: afterCount - beforeCount,
-          changePercent: beforeCount > 0 ? ((afterCount - beforeCount) / beforeCount * 100) : 0,
-          trend: afterCount > beforeCount ? "up" : afterCount < beforeCount ? "down" : "stable"
+          skill: skill.trim(),
+          beforeCount: week1Count,
+          afterCount: week2Count,
+          change: difference,
+          changePercent: percentageChange,
+          trend: difference > 0 ? "up" : difference < 0 ? "down" : "stable"
         };
-      }).sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+      }).filter(item => item !== null);
       
       console.log('✅ [processApiResponse] 주간 비교 처리 결과:', processedData);
       return processedData;
       
     } else {
       const processedData = data.map(item => {
-        const trend = calculateTrend(item.count || item.frequency, item.previous_count || 0);
+        if (!item || typeof item !== 'object') {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 아이템:', item);
+          return null;
+        }
+        
+        const skill = item.skill || item.skill_name || '';
+        const count = parseInt(item.count || item.frequency || 0);
+        
+        if (!skill || typeof skill !== 'string' || skill.trim() === '' || count <= 0) {
+          console.log('⚠️ [processApiResponse] 유효하지 않은 skill/count:', { skill, count });
+          return null;
+        }
+        
+        const trend = calculateTrend(count, parseInt(item.previous_count || 0));
         return {
-          skill: item.skill || item.skill_name,
-          count: item.count || item.frequency,
-          week_day: item.week_day,
+          skill: skill.trim(),
+          count: count,
+          week_day: item.week_day || `29.${(new Date().getFullYear() % 100)}`,
           trend: trend
         };
-      });
+      }).filter(item => item !== null);
       
       console.log('✅ [processApiResponse] 기본 처리 결과:', processedData);
       return processedData;
@@ -665,26 +812,27 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
 
   // calculateTrend 함수 추가
   const calculateTrend = (currentCount, previousCount) => {
-    if (previousCount === 0) return "stable";
+    // 입력값 검증
+    const current = parseInt(currentCount) || 0;
+    const previous = parseInt(previousCount) || 0;
     
-    const changeRatio = currentCount / previousCount;
-    if (changeRatio > 1.1) return "up";
-    if (changeRatio < 0.9) return "down";
+    if (previous === 0) return "stable";
+    
+    const changePercent = ((current - previous) / previous) * 100;
+    
+    if (changePercent > 10) return "up";
+    if (changePercent < -10) return "down";
     return "stable";
   };
 
   // 고유한 기술 개수 계산 함수
   const getUniqueSkillsCount = () => {
     console.log('🔍 [getUniqueSkillsCount] skillData:', skillData);
-    
-    const uniqueSkills = new Set();
-    skillData.forEach(item => {
-      if (item.skill && item.skill.trim()) {
-        uniqueSkills.add(item.skill.trim());
-      }
-    });
-    
-    const count = uniqueSkills.size;
+    if (!skillData || !Array.isArray(skillData)) {
+      console.log('❌ [getUniqueSkillsCount] 유효하지 않은 데이터');
+      return 0;
+    }
+    const count = skillData.length;
     console.log('✅ [getUniqueSkillsCount] 결과:', count);
     return count;
   };
@@ -692,9 +840,8 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   // 최고 인기 기술의 점유율 계산 함수
   const getTopSkillPercentage = () => {
     console.log('🔍 [getTopSkillPercentage] skillData:', skillData);
-    
-    if (skillData.length === 0) {
-      console.log('❌ [getTopSkillPercentage] 데이터 없음');
+    if (!skillData || !Array.isArray(skillData) || skillData.length === 0) {
+      console.log('❌ [getTopSkillPercentage] 유효하지 않은 데이터');
       return 0;
     }
     
@@ -716,28 +863,25 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   // 기술 다양성 지수 계산 (새로운 지표)
   const getSkillDiversityIndex = () => {
     console.log('🔍 [getSkillDiversityIndex] skillData:', skillData);
-    
-    if (skillData.length === 0) {
-      console.log('❌ [getSkillDiversityIndex] 데이터 없음');
+    if (!skillData || !Array.isArray(skillData) || skillData.length === 0) {
+      console.log('❌ [getSkillDiversityIndex] 유효하지 않은 데이터');
       return 0;
     }
     
     const totalCount = skillData.reduce((sum, skill) => sum + (skill.count || 0), 0);
+    console.log('🔍 [getSkillDiversityIndex] totalCount:', totalCount);
+    
     if (totalCount === 0) {
       console.log('❌ [getSkillDiversityIndex] 총 카운트가 0');
       return 0;
     }
     
-    // 각 기술의 비율 계산
     const proportions = skillData.map(skill => (skill.count || 0) / totalCount);
-    
-    // Shannon 다양성 지수 계산 (H = -Σ(p * log(p)))
     const diversityIndex = -proportions.reduce((sum, p) => {
       if (p > 0) return sum + (p * Math.log(p));
       return sum;
     }, 0);
     
-    // 0-100 스케일로 변환 (최대값은 log(기술개수))
     const maxDiversity = Math.log(skillData.length);
     const result = maxDiversity > 0 ? Math.round((diversityIndex / maxDiversity) * 100) : 0;
     
@@ -747,42 +891,17 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
 
   // 상승 중인 기술 개수 계산
   const getRisingSkillsCount = () => {
-    return skillData.filter(skill => skill.trend === "up").length;
+    console.log('🔍 [getRisingSkillsCount] skillData:', skillData);
+    if (!skillData || !Array.isArray(skillData)) {
+      console.log('❌ [getRisingSkillsCount] 유효하지 않은 데이터');
+      return 0;
+    }
+    const count = skillData.filter(skill => skill.trend === "up").length;
+    console.log('✅ [getRisingSkillsCount] 결과:', count);
+    return count;
   };
 
-  // 워드클라우드 데이터 가져오기 (첫 번째 버튼) - 올바른 엔드포인트로 수정
-  const fetchWordCloudData = async () => {
-    if (!selectedTrendJob) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // FastAPI 문서에 따른 올바른 엔드포인트 사용
-      const response = await axios.get(`${BASE_URL}/visualization/weekly_skill_frequency_current`, {
-        params: {
-          job_name: selectedTrendJob,
-          field: selectedField
-        }
-      });
-      
-      const data = response.data;
-      console.log('✅ [CareerRoadmapMain] 워드클라우드 데이터:', data);
-      
-      // 워드클라우드 형식으로 변환
-      const wordCloudData = data.map(item => ({
-        text: item.skill,
-        value: item.count
-      }));
-      
-      setSkillData(wordCloudData);
-    } catch (err) {
-      console.error('❌ [CareerRoadmapMain] 워드클라우드 데이터 조회 실패:', err);
-      setError('워드클라우드 데이터를 불러오는데 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   // 주간 비교 데이터 가져오기 (두 번째 버튼) - 이미 올바른 엔드포인트 사용 중
   const fetchWeeklyComparison = async () => {
@@ -816,12 +935,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     }
   };
 
-  // 시각화 타입 변경 시 데이터 가져오기
-  useEffect(() => {
-    if (visualizationType === "wordcloud" && selectedTrendJob) {
-      fetchWordCloudData();
-    }
-  }, [visualizationType, selectedTrendJob, selectedField]);
+
 
   // 캐시 설정
   const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4시간
@@ -857,7 +971,8 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
       console.error('스킬 데이터 캐시 저장 실패:', error);
     }
   };
-
+  const isWeeklyResultVisible = startWeek && endWeek && year;
+  
   return (
     <Container $darkMode={darkMode}>
       {/* ───────────── 트렌드 분석 ───────────── */}
@@ -931,17 +1046,22 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                 <FaCalendarAlt />
               </ToggleButton>
               <ToggleButton 
-                $active={visualizationType === "trend"}
-                $darkMode={darkMode}
-                onClick={() => setVisualizationType("trend")}
-              >
-                <FaChartLine />
-              </ToggleButton>
+    $active={visualizationType === "trend"}
+    $darkMode={darkMode}
+    onClick={() => {
+        setSkillData([]); // 이전 요약 정보 초기화
+        setIsTrendResultVisible(false); // ▼▼▼ 결과창 보임 상태 초기화 ▼▼▼
+        setVisualizationType("trend");
+    }}
+><FaChartLine />
+</ToggleButton>
             </VisualizationToggle>
           </ControlGroup>
         </CompactControlPanel>
 
-        <MainVisualizationArea $darkMode={darkMode} $visualizationType={visualizationType}>
+        <MainVisualizationArea $darkMode={darkMode} $visualizationType={visualizationType}
+        $isTrendResultVisible={isTrendResultVisible}
+        $isWeeklyResultVisible={isWeeklyResultVisible} >
           {loading ? (
             <LoadingContainer>
               <LoadingSpinner />
@@ -955,7 +1075,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
               <ErrorMessage>{error}</ErrorMessage>
               <ErrorNote>샘플 데이터를 표시합니다.</ErrorNote>
             </ErrorContainer>
-          ) : (visualizationType === "weekly_comparison" || skillData.length > 0) ? (
+          ) : (
             <>
               {visualizationType === "wordcloud" && (
                 <div style={{
@@ -966,56 +1086,38 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                   justifyContent: 'center',
                   position: 'relative'
                 }}>
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    transform: 'translateX(30px)' // 우측으로 30px 이동 (조정 가능)
-                  }}>
-                    <WordCloud
-                      words={skillData} // 이미 올바른 형식이므로 매핑 제거
-                      options={{
-                        rotations: 0,
-                        fontSizes: [18, 60],
-                        fontFamily: "Pretendard, sans-serif",
-                        enableTooltip: false,
-                        deterministic: true,
-                        removeDuplicateWords: false,
-                        colors: ["#264653", "#2a9d8f", "#e76f51", "#f4a261", "#e9c46a"],
-                        spiral: "archimedean",
-                        layout: "wordcloud",
-                      }}
-                      size={[520, 260]}
-                    />
-                  </div>
+                  <JobKeywordAnalysis
+                    selectedJob={selectedTrendJob}
+                    darkMode={darkMode}
+                    selectedFieldType={selectedField}
+                    isMainPage={true}
+                    onDataUpdate={(data) => {
+                      console.log('🔄 [CareerRoadmapMain] JobKeywordAnalysis 데이터 업데이트:', data);
+                      setSkillData(data);
+                    }}
+                  />
                 </div>
               )}
 
-              {visualizationType === "trend" && (
-                <TrendChartContainer>
-                  <ChartTitle>기술 트렌드 분석</ChartTitle>
-                  <CompactTrendGrid>
-                    {skillData.slice(0, 12).map((item, index) => (
-                      <TrendCard key={index} $darkMode={darkMode}>
-                        <TrendCardHeader>
-                          <TrendCardTitle>{item.skill}</TrendCardTitle>
-                          <TrendCardRank>#{index + 1}</TrendCardRank>
-                        </TrendCardHeader>
-                        <TrendCardBody>
-                          <TrendCardCount>{item.count}</TrendCardCount>
-                          <TrendCardTrend $trend={item.trend}>
-                            {getTrendIcon(item.trend)}
-                          </TrendCardTrend>
-                        </TrendCardBody>
-                      </TrendCard>
-                    ))}
-                  </CompactTrendGrid>
-                </TrendChartContainer>
-              )}
 
+
+
+
+{visualizationType === "trend" && (
+  <DailySkillTrend 
+    selectedJob={selectedTrendJob}
+    selectedField={selectedField}
+    darkMode={darkMode}
+    onDataUpdate={(data) => setSkillData(data)}
+    // ▼▼▼ 여기에 콜백 함수 전달 ▼▼▼
+    onResultVisibilityChange={setIsTrendResultVisible}
+  />
+)}
+        
+
+
+
+            
               {visualizationType === "weekly_comparison" && (
                 <WeeklyComparisonContainer>
                   {!startWeek || !endWeek || !year ? (
@@ -1025,7 +1127,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                         주간 스킬 빈도 조회 (주차 범위 지정)
                       </WeeklyInputTitle>
                       <WeeklyInputDescription $darkMode={darkMode}>
-                        선택한 직무명과 분석 필드에 대해, 지정된 주차 범위의 채용공고에서 추출된 기술/키워드의 주별 등장 빈도를 집계하여 반환합니다.
+                        지정된 주차 범위의 채용공고에서 추출된 기술/키워드의 주별 등장 빈도를 집계하여 반환합니다.
                       </WeeklyInputDescription>
                       
                       <WeeklyInputGrid>
@@ -1038,7 +1140,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                             required
                           >
                             <option value="">선택하세요</option>
-                            {Array.from({length: 53}, (_, i) => i + 1).map(week => (
+                            {availableWeeks.map(week => (
                               <option key={week} value={week}>{week}주차</option>
                             ))}
                           </FilterSelect>
@@ -1053,7 +1155,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                             required
                           >
                             <option value="">선택하세요</option>
-                            {Array.from({length: 53}, (_, i) => i + 1).map(week => (
+                            {availableWeeks.map(week => (
                               <option key={week} value={week}>{week}주차</option>
                             ))}
                           </FilterSelect>
@@ -1068,7 +1170,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                             required
                           >
                             <option value="">선택하세요</option>
-                            {[2024, 2025, 2026].map(year => (
+                            {availableYears.map(year => (
                               <option key={year} value={year}>{year}년</option>
                             ))}
                           </FilterSelect>
@@ -1081,10 +1183,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                         </InputError>
                       )}
                       
-                      <InputInfo $darkMode={darkMode}>
-                        <FaInfoCircle style={{ marginRight: '0.5rem' }} />
-                        현재 29주차, 30주차에 데이터가 있습니다. 해당 범위로 설정해보세요.
-                      </InputInfo>
+
                     </WeeklyInputContainer>
                   ) : (
                     <WeeklyComparisonResult>
@@ -1102,8 +1201,9 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                         </FullViewButton>
                       </ComparisonHeader>
                       
+                      {comparisonData && comparisonData.all_skills && comparisonData.all_skills.length > 0 ? (
                       <ComparisonGrid>
-                        {skillData.slice(0, 10).map((item, index) => (
+                          {comparisonData.all_skills.slice(0, 10).map((item, index) => (
                           <ComparisonCard key={index} $darkMode={darkMode}>
                             <SkillName $darkMode={darkMode}>{item.skill}</SkillName>
                             
@@ -1111,40 +1211,46 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                               <BeforeAfterSection>
                                 <BeforeSection>
                                   <BeforeLabel>이전</BeforeLabel>
-                                  <BeforeCount>{item.beforeCount || 0}</BeforeCount>
+                                    <BeforeCount>{item.week1_count || 0}</BeforeCount>
                                 </BeforeSection>
                                 
                                 <ArrowSection>
-                                  {getTrendIcon(item.trend || "stable")}
+                                    {getTrendIcon(item.difference > 0 ? "up" : item.difference < 0 ? "down" : "stable")}
                                 </ArrowSection>
                                 
                                 <AfterSection>
                                   <AfterLabel>이후</AfterLabel>
-                                  <AfterCount $trend={item.trend || "stable"}>{item.afterCount || 0}</AfterCount>
+                                    <AfterCount $trend={item.difference > 0 ? "up" : item.difference < 0 ? "down" : "stable"}>{item.week2_count || 0}</AfterCount>
                                 </AfterSection>
                               </BeforeAfterSection>
                               
                               <ChangeInfo>
-                                <ChangeAmount $trend={item.trend || "stable"}>
-                                  {item.change > 0 ? '+' : ''}{item.change || 0}
+                                  <ChangeAmount $trend={item.difference > 0 ? "up" : item.difference < 0 ? "down" : "stable"}>
+                                    {item.difference > 0 ? '+' : ''}{item.difference || 0}
                                 </ChangeAmount>
-                                <ChangePercent $trend={item.trend || "stable"}>
-                                  ({item.changePercent > 0 ? '+' : ''}{(item.changePercent || 0).toFixed(1)}%)
+                                  <ChangePercent $trend={item.difference > 0 ? "up" : item.difference < 0 ? "down" : "stable"}>
+                                    ({item.percentage_change > 0 ? '+' : ''}{(item.percentage_change || 0).toFixed(1)}%)
                                 </ChangePercent>
                               </ChangeInfo>
                             </ComparisonData>
                           </ComparisonCard>
                         ))}
                       </ComparisonGrid>
-                    </WeeklyComparisonResult>
+                      ) : (
+                        <NoDataContainer>
+                          <NoDataIcon>📊</NoDataIcon>
+                          <NoDataTitle>데이터가 없습니다</NoDataTitle>
+                          <NoDataMessage>
+                            선택한 주차 범위에 해당하는 데이터가 없습니다.<br />
+                            다른 주차를 선택해보세요.
+                          </NoDataMessage>
+                        </NoDataContainer>
+                      )}
+                    </WeeklyComparisonResult> 
                   )}
                 </WeeklyComparisonContainer>
               )}
             </>
-          ) : (
-            <NoDataText $darkMode={darkMode}>
-              데이터가 없습니다.
-            </NoDataText>
           )}
         </MainVisualizationArea>
 
@@ -1155,53 +1261,137 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
           </InsightsButton>
         </div> */}
 
-        {/* 하단 통계 - 주간 비교가 아닐 때만 표시 */}
-        {visualizationType !== "weekly_comparison" && (
-          <QuickStats $darkMode={darkMode}>
-            <StatItem 
-              $darkMode={darkMode}
-              title="채용공고에서 언급된 서로 다른 기술의 총 개수 (중복 제외)"
-            >
-              <StatIcon>
-                <FaHashtag />
-              </StatIcon>
-              <StatValue>{getUniqueSkillsCount()}</StatValue>
-              <StatLabel $darkMode={darkMode}>기술 개수</StatLabel>
-            </StatItem>
-            <StatItem 
-              $darkMode={darkMode}
-              title="채용공고에서 가장 많이 언급된 기술 키워드"
-            >
-              <StatIcon>
-                <FaStar />
-              </StatIcon>
-              <StatValue>
-                {skillData.length > 0 && skillData[0]?.skill ? skillData[0].skill : '데이터 없음'}
-              </StatValue>
-              <StatLabel $darkMode={darkMode}>최고 인기</StatLabel>
-            </StatItem>
-            <StatItem 
-              $darkMode={darkMode}
-              title="최고 인기 기술이 전체 기술 언급 중 차지하는 비율 (%)"
-            >
-              <StatIcon>
-                <FaChartBar />
-              </StatIcon>
-              <StatValue>{getTopSkillPercentage()}%</StatValue>
-              <StatLabel $darkMode={darkMode}>최고 점유율</StatLabel>
-            </StatItem>
-            <StatItem 
-              $darkMode={darkMode}
-              title="기술 분포의 다양성 지수 (0-100, 높을수록 다양함)"
-            >
-              <StatIcon>
-                <FaChartPie />
-              </StatIcon>
-              <StatValue>{getSkillDiversityIndex()}</StatValue>
-              <StatLabel $darkMode={darkMode}>기술 다양성</StatLabel>
-            </StatItem>
-          </QuickStats>
-        )}
+        {/* 하단 통계 통합 블록 */}
+        {(() => {
+          // 현재 선택된 시각화 نوع에 따라 올바른 요약 정보를 표시합니다.
+          switch (visualizationType) {
+            case 'wordcloud':
+              return (
+                <QuickStats $darkMode={darkMode}>
+                  <StatItem
+                    $darkMode={darkMode}
+                    title="채용공고에서 언급된 서로 다른 기술의 총 개수 (중복 제외)"
+                  >
+                    <StatIcon><FaHashtag /></StatIcon>
+                    <StatValue>{getUniqueSkillsCount()}</StatValue>
+                    <StatLabel $darkMode={darkMode}>기술 개수</StatLabel>
+                  </StatItem>
+                  <StatItem
+                    $darkMode={darkMode}
+                    title="채용공고에서 가장 많이 언급된 기술 키워드"
+                  >
+                    <StatIcon><FaStar /></StatIcon>
+                    <StatValue>
+                      {skillData.length > 0 && skillData[0]?.skill ? skillData[0].skill : '데이터 없음'}
+                    </StatValue>
+                    <StatLabel $darkMode={darkMode}>최고 인기</StatLabel>
+                  </StatItem>
+                  <StatItem
+                    $darkMode={darkMode}
+                    title="최고 인기 기술이 전체 기술 언급 중 차지하는 비율 (%)"
+                  >
+                    <StatIcon><FaChartBar /></StatIcon>
+                    <StatValue>{getTopSkillPercentage()}%</StatValue>
+                    <StatLabel $darkMode={darkMode}>최고 점유율</StatLabel>
+                  </StatItem>
+                  <StatItem
+                    $darkMode={darkMode}
+                    title="기술 분포의 다양성 지수 (0-100, 높을수록 다양함)"
+                  >
+                    <StatIcon><FaChartPie /></StatIcon>
+                    <StatValue>{getSkillDiversityIndex()}</StatValue>
+                    <StatLabel $darkMode={darkMode}>기술 다양성</StatLabel>
+                  </StatItem>
+                </QuickStats>
+              );
+
+              case 'trend':
+                // if 조건을 제거하여 데이터가 없을 때도 요약 정보 창이 항상 표시되도록 합니다.
+                // trendStats가 데이터가 없을 때 기본값을 반환하므로 안전합니다.
+                return (
+                  <QuickStats $darkMode={darkMode}>
+                    <StatItem title="차트에 표시된 고유 기술의 총 개수">
+                      <StatIcon><FaHashtag /></StatIcon>
+                      <StatValue>{trendStats.uniqueSkills}</StatValue>
+                      <StatLabel $darkMode={darkMode}>분석 기술 수</StatLabel>
+                    </StatItem>
+                    <StatItem title={`기간 내 가장 높은 빈도를 기록한 기술: ${trendStats.peakSkill.skill} (${trendStats.peakSkill.count}회)`}>
+                      <StatIcon><FaStar /></StatIcon>
+                      <StatValue>{trendStats.peakSkill.skill}</StatValue>
+                      <StatLabel $darkMode={darkMode}>최고점 기술</StatLabel>
+                    </StatItem>
+                    <StatItem title={`기간 내 빈도수가 가장 많이 증가한 기술 (+${trendStats.topMover.increase})`}>
+                      <StatIcon><FaChartLine /></StatIcon>
+                      <StatValue>{trendStats.topMover.increase > 0 ? trendStats.topMover.skill : '없음'}</StatValue>
+                      <StatLabel $darkMode={darkMode}>상승세 기술</StatLabel>
+                    </StatItem>
+                    <StatItem title="모든 데이터 포인트의 평균 빈도수">
+                      <StatIcon><FaChartBar /></StatIcon>
+                      <StatValue>{trendStats.avgFrequency}</StatValue>
+                      <StatLabel $darkMode={darkMode}>평균 빈도수</StatLabel>
+                    </StatItem>
+                  </QuickStats>
+                );
+
+                case 'weekly_comparison':
+                  // if 조건을 제거하여 데이터 조회 전에도 기본값이 표시되도록 합니다.
+                  return (
+                    <QuickStats $darkMode={darkMode}>
+                      <StatItem
+                        $darkMode={darkMode}
+                        title="절대값 차이가 가장 큰 스킬"
+                      >
+                        <StatIcon><FaArrowUp /></StatIcon>
+                        <StatValue>
+                          {comparisonData?.biggest_difference?.skill || '없음'}
+                        </StatValue>
+                        <StatLabel $darkMode={darkMode}>
+                          {comparisonData?.biggest_difference?.difference > 0 ? '+' : ''}{comparisonData?.biggest_difference?.difference || 0}
+                        </StatLabel>
+                      </StatItem>
+                      <StatItem
+                        $darkMode={darkMode}
+                        title="절대값 차이가 가장 작은 스킬"
+                      >
+                        <StatIcon><FaArrowDown /></StatIcon>
+                        <StatValue>
+                          {comparisonData?.smallest_difference?.skill || '없음'}
+                        </StatValue>
+                        <StatLabel $darkMode={darkMode}>
+                          {comparisonData?.smallest_difference?.difference > 0 ? '+' : ''}{comparisonData?.smallest_difference?.difference || 0}
+                        </StatLabel>
+                      </StatItem>
+                      <StatItem
+                        $darkMode={darkMode}
+                        title="퍼센트 변화가 가장 큰 스킬"
+                      >
+                        <StatIcon><FaChartLine /></StatIcon>
+                        <StatValue>
+                          {comparisonData?.biggest_percentage?.skill || '없음'}
+                        </StatValue>
+                        <StatLabel $darkMode={darkMode}>
+                          {comparisonData?.biggest_percentage?.percentage_change > 0 ? '+' : ''}{(comparisonData?.biggest_percentage?.percentage_change || 0).toFixed(1)}%
+                        </StatLabel>
+                      </StatItem>
+                      <StatItem
+                        $darkMode={darkMode}
+                        title="퍼센트 변화가 가장 작은 스킬"
+                      >
+                        <StatIcon><FaChartArea /></StatIcon>
+                        <StatValue>
+                          {comparisonData?.smallest_percentage?.skill || '없음'}
+                        </StatValue>
+                        <StatLabel $darkMode={darkMode}>
+                          {comparisonData?.smallest_percentage?.percentage_change > 0 ? '+' : ''}{(comparisonData?.smallest_percentage?.percentage_change || 0).toFixed(1)}%
+                        </StatLabel>
+                      </StatItem>
+                    </QuickStats>
+                  );
+              
+            default:
+              return null;
+          }
+        })()}
       </SectionCard>
 
       {/* 주간 비교 팝업 */}
@@ -1227,28 +1417,16 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
             {/* 비교 타입 버튼들 추가 */}
             <WeeklyComparisonTypeButtons>
               <ComparisonTypeButton 
-                onClick={() => setSelectedComparisonType("biggest_difference")}
-                $active={selectedComparisonType === "biggest_difference"}
+                onClick={() => setSelectedComparisonType("all_skills")}
+                $active={selectedComparisonType === "all_skills"}
               >
-                최대 차이
+                전체 스킬
               </ComparisonTypeButton>
               <ComparisonTypeButton 
-                onClick={() => setSelectedComparisonType("smallest_difference")}
-                $active={selectedComparisonType === "smallest_difference"}
+                onClick={() => setSelectedComparisonType("max_min")}
+                $active={selectedComparisonType === "max_min"}
               >
-                최소 차이
-              </ComparisonTypeButton>
-              <ComparisonTypeButton 
-                onClick={() => setSelectedComparisonType("biggest_percentage")}
-                $active={selectedComparisonType === "biggest_percentage"}
-              >
-                최대 비율
-              </ComparisonTypeButton>
-              <ComparisonTypeButton 
-                onClick={() => setSelectedComparisonType("smallest_percentage")}
-                $active={selectedComparisonType === "smallest_percentage"}
-              >
-                최소 비율
+                최대/최소
               </ComparisonTypeButton>
             </WeeklyComparisonTypeButtons>
             
@@ -1293,15 +1471,173 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
                 ))}
               </WeeklyComparisonPopupGrid>
             ) : (
-              /* 특정 비교 타입 결과 표시 */
-              comparisonData[selectedComparisonType] && (
-                <WeeklyComparisonSpecificResult $darkMode={darkMode}>
-                  <h4>{comparisonData[selectedComparisonType].skill}</h4>
-                  <div>Week 1: {comparisonData[selectedComparisonType].week1_count}</div>
-                  <div>Week 2: {comparisonData[selectedComparisonType].week2_count}</div>
-                  <div>차이: {comparisonData[selectedComparisonType].difference}</div>
-                  <div>비율 변화: {comparisonData[selectedComparisonType].percentage_change}%</div>
-                </WeeklyComparisonSpecificResult>
+              /* 최대/최소 결과 표시 */
+              selectedComparisonType === "max_min" && comparisonData && (
+                <WeeklyComparisonMaxMinGrid>
+                  {/* 최대 차이 */}
+                  {comparisonData.biggest_difference && (
+                    <WeeklyComparisonMaxMinCard $darkMode={darkMode}>
+                      <WeeklyComparisonMaxMinHeader>
+                        <WeeklyComparisonMaxMinTitle $darkMode={darkMode}>절대값 차이가 가장 큰 스킬</WeeklyComparisonMaxMinTitle>
+                        <WeeklyComparisonMaxMinSkill $darkMode={darkMode}>
+                          {comparisonData.biggest_difference.skill}
+                        </WeeklyComparisonMaxMinSkill>
+                      </WeeklyComparisonMaxMinHeader>
+                      
+                      <WeeklyComparisonMaxMinData>
+                        <WeeklyComparisonMaxMinBeforeAfter>
+                          <WeeklyComparisonMaxMinBefore>
+                            <WeeklyComparisonMaxMinLabel>Week 1</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount>{comparisonData.biggest_difference.week1_count}</WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinBefore>
+                          
+                          <WeeklyComparisonMaxMinArrow>
+                            {getTrendIcon(comparisonData.biggest_difference.difference > 0 ? "up" : comparisonData.biggest_difference.difference < 0 ? "down" : "stable")}
+                          </WeeklyComparisonMaxMinArrow>
+                          
+                          <WeeklyComparisonMaxMinAfter>
+                            <WeeklyComparisonMaxMinLabel>Week 2</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount $trend={comparisonData.biggest_difference.difference > 0 ? "up" : comparisonData.biggest_difference.difference < 0 ? "down" : "stable"}>
+                              {comparisonData.biggest_difference.week2_count}
+                            </WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinAfter>
+                        </WeeklyComparisonMaxMinBeforeAfter>
+                        
+                        <WeeklyComparisonMaxMinChange>
+                          <WeeklyComparisonMaxMinChangeAmount $trend={comparisonData.biggest_difference.difference > 0 ? "up" : comparisonData.biggest_difference.difference < 0 ? "down" : "stable"}>
+                            {comparisonData.biggest_difference.difference > 0 ? '+' : ''}{comparisonData.biggest_difference.difference}
+                          </WeeklyComparisonMaxMinChangeAmount>
+                          <WeeklyComparisonMaxMinChangePercent $trend={comparisonData.biggest_difference.difference > 0 ? "up" : comparisonData.biggest_difference.difference < 0 ? "down" : "stable"}>
+                            ({comparisonData.biggest_difference.percentage_change > 0 ? '+' : ''}{comparisonData.biggest_difference.percentage_change.toFixed(1)}%)
+                          </WeeklyComparisonMaxMinChangePercent>
+                        </WeeklyComparisonMaxMinChange>
+                      </WeeklyComparisonMaxMinData>
+                    </WeeklyComparisonMaxMinCard>
+                  )}
+
+                  {/* 최소 차이 */}
+                  {comparisonData.smallest_difference && (
+                    <WeeklyComparisonMaxMinCard $darkMode={darkMode}>
+                      <WeeklyComparisonMaxMinHeader>
+                        <WeeklyComparisonMaxMinTitle $darkMode={darkMode}>절대값 차이가 가장 작은 스킬</WeeklyComparisonMaxMinTitle>
+                        <WeeklyComparisonMaxMinSkill $darkMode={darkMode}>
+                          {comparisonData.smallest_difference.skill}
+                        </WeeklyComparisonMaxMinSkill>
+                      </WeeklyComparisonMaxMinHeader>
+                      
+                      <WeeklyComparisonMaxMinData>
+                        <WeeklyComparisonMaxMinBeforeAfter>
+                          <WeeklyComparisonMaxMinBefore>
+                            <WeeklyComparisonMaxMinLabel>Week 1</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount>{comparisonData.smallest_difference.week1_count}</WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinBefore>
+                          
+                          <WeeklyComparisonMaxMinArrow>
+                            {getTrendIcon(comparisonData.smallest_difference.difference > 0 ? "up" : comparisonData.smallest_difference.difference < 0 ? "down" : "stable")}
+                          </WeeklyComparisonMaxMinArrow>
+                          
+                          <WeeklyComparisonMaxMinAfter>
+                            <WeeklyComparisonMaxMinLabel>Week 2</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount $trend={comparisonData.smallest_difference.difference > 0 ? "up" : comparisonData.smallest_difference.difference < 0 ? "down" : "stable"}>
+                              {comparisonData.smallest_difference.week2_count}
+                            </WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinAfter>
+                        </WeeklyComparisonMaxMinBeforeAfter>
+                        
+                        <WeeklyComparisonMaxMinChange>
+                          <WeeklyComparisonMaxMinChangeAmount $trend={comparisonData.smallest_difference.difference > 0 ? "up" : comparisonData.smallest_difference.difference < 0 ? "down" : "stable"}>
+                            {comparisonData.smallest_difference.difference > 0 ? '+' : ''}{comparisonData.smallest_difference.difference}
+                          </WeeklyComparisonMaxMinChangeAmount>
+                          <WeeklyComparisonMaxMinChangePercent $trend={comparisonData.smallest_difference.difference > 0 ? "up" : comparisonData.smallest_difference.difference < 0 ? "down" : "stable"}>
+                            ({comparisonData.smallest_difference.percentage_change > 0 ? '+' : ''}{comparisonData.smallest_difference.percentage_change.toFixed(1)}%)
+                          </WeeklyComparisonMaxMinChangePercent>
+                        </WeeklyComparisonMaxMinChange>
+                      </WeeklyComparisonMaxMinData>
+                    </WeeklyComparisonMaxMinCard>
+                  )}
+
+                  {/* 최대 비율 */}
+                  {comparisonData.biggest_percentage && (
+                    <WeeklyComparisonMaxMinCard $darkMode={darkMode}>
+                      <WeeklyComparisonMaxMinHeader>
+                        <WeeklyComparisonMaxMinTitle $darkMode={darkMode}>퍼센트 변화가 가장 큰 스킬</WeeklyComparisonMaxMinTitle>
+                        <WeeklyComparisonMaxMinSkill $darkMode={darkMode}>
+                          {comparisonData.biggest_percentage.skill}
+                        </WeeklyComparisonMaxMinSkill>
+                      </WeeklyComparisonMaxMinHeader>
+                      
+                      <WeeklyComparisonMaxMinData>
+                        <WeeklyComparisonMaxMinBeforeAfter>
+                          <WeeklyComparisonMaxMinBefore>
+                            <WeeklyComparisonMaxMinLabel>Week 1</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount>{comparisonData.biggest_percentage.week1_count}</WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinBefore>
+                          
+                          <WeeklyComparisonMaxMinArrow>
+                            {getTrendIcon(comparisonData.biggest_percentage.difference > 0 ? "up" : comparisonData.biggest_percentage.difference < 0 ? "down" : "stable")}
+                          </WeeklyComparisonMaxMinArrow>
+                          
+                          <WeeklyComparisonMaxMinAfter>
+                            <WeeklyComparisonMaxMinLabel>Week 2</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount $trend={comparisonData.biggest_percentage.difference > 0 ? "up" : comparisonData.biggest_percentage.difference < 0 ? "down" : "stable"}>
+                              {comparisonData.biggest_percentage.week2_count}
+                            </WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinAfter>
+                        </WeeklyComparisonMaxMinBeforeAfter>
+                        
+                        <WeeklyComparisonMaxMinChange>
+                          <WeeklyComparisonMaxMinChangeAmount $trend={comparisonData.biggest_percentage.difference > 0 ? "up" : comparisonData.biggest_percentage.difference < 0 ? "down" : "stable"}>
+                            {comparisonData.biggest_percentage.difference > 0 ? '+' : ''}{comparisonData.biggest_percentage.difference}
+                          </WeeklyComparisonMaxMinChangeAmount>
+                          <WeeklyComparisonMaxMinChangePercent $trend={comparisonData.biggest_percentage.difference > 0 ? "up" : comparisonData.biggest_percentage.difference < 0 ? "down" : "stable"}>
+                            ({comparisonData.biggest_percentage.percentage_change > 0 ? '+' : ''}{comparisonData.biggest_percentage.percentage_change.toFixed(1)}%)
+                          </WeeklyComparisonMaxMinChangePercent>
+                        </WeeklyComparisonMaxMinChange>
+                      </WeeklyComparisonMaxMinData>
+                    </WeeklyComparisonMaxMinCard>
+                  )}
+
+                  {/* 최소 비율 */}
+                  {comparisonData.smallest_percentage && (
+                    <WeeklyComparisonMaxMinCard $darkMode={darkMode}>
+                      <WeeklyComparisonMaxMinHeader>
+                        <WeeklyComparisonMaxMinTitle $darkMode={darkMode}>퍼센트 변화가 가장 작은 스킬</WeeklyComparisonMaxMinTitle>
+                        <WeeklyComparisonMaxMinSkill $darkMode={darkMode}>
+                          {comparisonData.smallest_percentage.skill}
+                        </WeeklyComparisonMaxMinSkill>
+                      </WeeklyComparisonMaxMinHeader>
+                      
+                      <WeeklyComparisonMaxMinData>
+                        <WeeklyComparisonMaxMinBeforeAfter>
+                          <WeeklyComparisonMaxMinBefore>
+                            <WeeklyComparisonMaxMinLabel>Week 1</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount>{comparisonData.smallest_percentage.week1_count}</WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinBefore>
+                          
+                          <WeeklyComparisonMaxMinArrow>
+                            {getTrendIcon(comparisonData.smallest_percentage.difference > 0 ? "up" : comparisonData.smallest_percentage.difference < 0 ? "down" : "stable")}
+                          </WeeklyComparisonMaxMinArrow>
+                          
+                          <WeeklyComparisonMaxMinAfter>
+                            <WeeklyComparisonMaxMinLabel>Week 2</WeeklyComparisonMaxMinLabel>
+                            <WeeklyComparisonMaxMinCount $trend={comparisonData.smallest_percentage.difference > 0 ? "up" : comparisonData.smallest_percentage.difference < 0 ? "down" : "stable"}>
+                              {comparisonData.smallest_percentage.week2_count}
+                            </WeeklyComparisonMaxMinCount>
+                          </WeeklyComparisonMaxMinAfter>
+                        </WeeklyComparisonMaxMinBeforeAfter>
+                        
+                        <WeeklyComparisonMaxMinChange>
+                          <WeeklyComparisonMaxMinChangeAmount $trend={comparisonData.smallest_percentage.difference > 0 ? "up" : comparisonData.smallest_percentage.difference < 0 ? "down" : "stable"}>
+                            {comparisonData.smallest_percentage.difference > 0 ? '+' : ''}{comparisonData.smallest_percentage.difference}
+                          </WeeklyComparisonMaxMinChangeAmount>
+                          <WeeklyComparisonMaxMinChangePercent $trend={comparisonData.smallest_percentage.difference > 0 ? "up" : comparisonData.smallest_percentage.difference < 0 ? "down" : "stable"}>
+                            ({comparisonData.smallest_percentage.percentage_change > 0 ? '+' : ''}{comparisonData.smallest_percentage.percentage_change.toFixed(1)}%)
+                          </WeeklyComparisonMaxMinChangePercent>
+                        </WeeklyComparisonMaxMinChange>
+                      </WeeklyComparisonMaxMinData>
+                    </WeeklyComparisonMaxMinCard>
+                  )}
+                </WeeklyComparisonMaxMinGrid>
               )
             )}
           </WeeklyComparisonPopupContent>
@@ -2562,20 +2898,42 @@ const ToggleButton = styled.button`
   }
 `;
 
-// 메인 시각화 영역 (더 컴팩트)
 const MainVisualizationArea = styled.div`
   background: ${({ $darkMode }) => ($darkMode ? "#1e1e1e" : "#fff")};
   border-radius: 0.8rem;
   padding: 1.5rem;
   border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
-  height: 400px;
-  display: flex;
-  align-items: ${({ $visualizationType }) => $visualizationType === "weekly_comparison" ? "flex-start" : "center"};
-  justify-content: center;
   margin-bottom: 0.8rem;
-  overflow: ${({ $visualizationType }) => $visualizationType === "weekly_comparison" ? "auto" : "hidden"};
+  transition: height 0.3s ease;
+  height: 400px; 
+  
+  /* ▼▼▼ 이 부분이 가장 중요합니다 ▼▼▼ */
+  overflow-y: ${({ $visualizationType, $isTrendResultVisible, $isWeeklyResultVisible }) =>
+    ($visualizationType === 'trend' && $isTrendResultVisible) || ($visualizationType === 'weekly_comparison' && $isWeeklyResultVisible)
+        ? 'auto'
+        : 'hidden'};
+  
+  display: flex;
+  justify-content: center;
+  align-items: ${({ $visualizationType }) =>
+    $visualizationType === 'wordcloud' ? 'center' : 'flex-start'};
+  
+  /* 스크롤바 스타일 */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f1f1f1'};
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: ${({ $darkMode }) => $darkMode ? '#555' : '#888'};
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${({ $darkMode }) => $darkMode ? '#666' : '#555'};
+  }
 `;
-
 const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -2712,6 +3070,36 @@ const TrendIcon = styled.div`
 
 const TrendChartContainer = styled.div`
   width: 100%;
+`;
+
+const NoDataContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  min-height: 200px;
+`;
+
+const NoDataIcon = styled.div`
+  font-size: 3rem;
+  color: ${({ $darkMode }) => ($darkMode ? "#666" : "#ccc")};
+  margin-bottom: 1rem;
+`;
+
+const NoDataTitle = styled.h3`
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
+  margin-bottom: 0.5rem;
+`;
+
+const NoDataMessage = styled.p`
+  font-size: 0.9rem;
+  color: ${({ $darkMode }) => ($darkMode ? "#999" : "#888")};
+  line-height: 1.4;
+  max-width: 300px;
 `;
 
 const CompactTrendGrid = styled.div`
@@ -3247,8 +3635,9 @@ const WeeklyComparisonContainer = styled.div`
 const WeeklyInputContainer = styled.div`
   background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f8f9fa'};
   border-radius: 1rem;
-  padding: 2rem;
-  margin-bottom: 1rem;
+  padding: 3rem;
+  margin-bottom: 0.1rem;
+  overflow: hidden;
 `;
 
 const WeeklyInputTitle = styled.h3`
@@ -3296,37 +3685,14 @@ const InputInfo = styled.div`
 
 const WeeklyComparisonResult = styled.div`
   width: 100%;
-  height: 100%;
-  overflow-y: auto;
+  /* height: 100%; -> 제거 (부모 높이에 종속되지 않도록) */
+  /* overflow-y: auto; -> 제거 (부모가 스크롤을 제어하도록) */
   background: #fff;
   border-radius: 0.8rem;
   padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   
-  /* 스크롤바 스타일링 */
-  &::-webkit-scrollbar {
-    width: 10px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 5px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 5px;
-    border: 2px solid #f1f1f1;
-  }
-  
-  &::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-  }
-  
-  /* 스크롤바가 나타날 때 패딩 조정 */
-  &:hover {
-    padding-right: 1rem;
-  }
+  /* 스크롤 관련 스타일(스크롤바, hover)을 모두 제거합니다. */
 `;
 
 const ComparisonHeader = styled.div`
@@ -3745,18 +4111,187 @@ const ComparisonTypeButton = styled.button`
 `;
 
 const WeeklyComparisonSpecificResult = styled.div`
-  padding: 1rem;
+  padding: 2rem;
   background: ${props => props.$darkMode ? '#444' : '#f8f9fa'};
-  border-radius: 8px;
+  border-radius: 12px;
   text-align: center;
-  
-  h4 {
-    margin: 0 0 1rem 0;
+  max-width: 500px;
+  margin: 0 auto;
+`;
+
+const WeeklyComparisonSpecificHeader = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const WeeklyComparisonSpecificTitle = styled.h3`
+  margin: 0 0 0.5rem 0;
+  color: ${props => props.$darkMode ? '#fff' : '#333'};
+  font-size: 1.1rem;
+  font-weight: 600;
+`;
+
+const WeeklyComparisonSpecificSkill = styled.div`
+  color: ${props => props.$darkMode ? '#ffa500' : '#ff6b35'};
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+`;
+
+const WeeklyComparisonSpecificData = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+`;
+
+const WeeklyComparisonSpecificBeforeAfter = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+`;
+
+const WeeklyComparisonSpecificBefore = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const WeeklyComparisonSpecificAfter = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const WeeklyComparisonSpecificLabel = styled.div`
+  color: ${props => props.$darkMode ? '#ccc' : '#666'};
+  font-size: 0.9rem;
+  font-weight: 500;
+`;
+
+const WeeklyComparisonSpecificCount = styled.div`
+  color: ${props => props.$darkMode ? '#fff' : '#333'};
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
+`;
+
+const WeeklyComparisonSpecificArrow = styled.div`
+  font-size: 1.2rem;
+  color: ${props => props.$darkMode ? '#ccc' : '#666'};
+`;
+
+const WeeklyComparisonSpecificChange = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const WeeklyComparisonSpecificChangeAmount = styled.div`
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
+`;
+
+const WeeklyComparisonSpecificChangePercent = styled.div`
+  font-size: 1rem;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
+`;
+
+const WeeklyComparisonMaxMinGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+`;
+
+const WeeklyComparisonMaxMinCard = styled.div`
+  background: ${props => props.$darkMode ? '#444' : '#f8f9fa'};
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px solid ${props => props.$darkMode ? '#555' : '#e9ecef'};
+`;
+
+const WeeklyComparisonMaxMinHeader = styled.div`
+  margin-bottom: 1.5rem;
+`;
+
+const WeeklyComparisonMaxMinTitle = styled.h4`
+  margin: 0 0 0.5rem 0;
     color: ${props => props.$darkMode ? '#fff' : '#333'};
-  }
-  
-  div {
-    margin: 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+`;
+
+const WeeklyComparisonMaxMinSkill = styled.div`
+  color: ${props => props.$darkMode ? '#ffa500' : '#ff6b35'};
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+`;
+
+const WeeklyComparisonMaxMinData = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const WeeklyComparisonMaxMinBeforeAfter = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+`;
+
+const WeeklyComparisonMaxMinBefore = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+`;
+
+const WeeklyComparisonMaxMinAfter = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+`;
+
+const WeeklyComparisonMaxMinLabel = styled.div`
     color: ${props => props.$darkMode ? '#ccc' : '#666'};
-  }
+  font-size: 0.8rem;
+  font-weight: 500;
+`;
+
+const WeeklyComparisonMaxMinCount = styled.div`
+  color: ${props => props.$darkMode ? '#fff' : '#333'};
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
+`;
+
+const WeeklyComparisonMaxMinArrow = styled.div`
+  font-size: 1rem;
+  color: ${props => props.$darkMode ? '#ccc' : '#666'};
+`;
+
+const WeeklyComparisonMaxMinChange = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+`;
+
+const WeeklyComparisonMaxMinChangeAmount = styled.div`
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
+`;
+
+const WeeklyComparisonMaxMinChangePercent = styled.div`
+  font-size: 0.9rem;
+  color: ${props => props.$trend === "up" ? "#28a745" : props.$trend === "down" ? "#dc3545" : "#6c757d"};
 `;

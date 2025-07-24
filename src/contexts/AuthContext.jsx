@@ -41,21 +41,27 @@ export const AuthProvider = ({ children }) => {
     setUser({ id: userId, token });
   };
 
-  const logout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("chatSessionId");
-    localStorage.removeItem("lastSelectedPage");
-    
-    // 사용자별 캐시된 추천 공고도 삭제
-    const userId = localStorage.getItem("userId");
-    if (userId) {
-      localStorage.removeItem(`cachedRecommendations_${userId}`);
-    }
-    
-    setIsLoggedIn(false);
-    setUser(null);
-  };
+ // AuthContext.jsx
+
+const logout = () => {
+  // 👇 [수정] userId를 먼저 변수에 저장합니다.
+  const userId = localStorage.getItem("userId");
+
+  // 이제 안심하고 localStorage 아이템들을 삭제합니다.
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userId");
+  localStorage.removeItem("chatSessionId");
+  localStorage.removeItem("lastSelectedPage");
+  
+  // 위에서 미리 저장해둔 userId를 사용해 캐시를 삭제합니다.
+  if (userId) {
+    localStorage.removeItem(`cachedRecommendations_${userId}`);
+  }
+  
+  // 앱의 상태를 업데이트하여 모든 컴포넌트에 로그아웃을 알립니다.
+  setIsLoggedIn(false);
+  setUser(null);
+};
 
   const value = {
     isLoggedIn,

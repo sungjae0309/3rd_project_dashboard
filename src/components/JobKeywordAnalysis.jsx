@@ -8,7 +8,7 @@ import { FaCalendarDay, FaCalendarWeek, FaInfoCircle } from "react-icons/fa";
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
-export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFieldType, isMainPage = false }) {
+export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFieldType, isMainPage = false, onDataUpdate }) {
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -72,6 +72,7 @@ export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFiel
     console.log("트렌드 데이터 요청 - 직무:", selectedJob, "필드:", selectedFieldType, "메인페이지:", isMainPage);
 
     const fetchTrendData = async () => {
+      console.log('🔄 [JobKeywordAnalysis] fetchTrendData 시작:', { selectedJob, selectedFieldType, isMainPage });
       setLoading(true);
       setError(null);
       
@@ -133,6 +134,18 @@ export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFiel
         setTrendData(words);
         setCacheKey(currentCacheKey);
         setHasInitialized(true);
+        
+        // 부모 컴포넌트로 데이터 전달
+        if (onDataUpdate) {
+          const processedData = words.map(item => ({
+            skill: item.text,
+            count: item.value,
+            text: item.text,
+            value: item.value
+          }));
+          console.log('🔄 [JobKeywordAnalysis] 부모로 전달할 데이터:', processedData);
+          onDataUpdate(processedData);
+        }
       } catch (err) {
         console.error("트렌드 데이터 로딩 실패:", err);
         setError("트렌드 데이터를 불러오는데 실패했습니다.");
@@ -150,7 +163,7 @@ export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFiel
 
   const options = useMemo(() => ({
     rotations: 0,
-    fontSizes: isMainPage ? [10, 25] : [14, 50], // 메인페이지에서는 작은 폰트 크기 사용
+    fontSizes: isMainPage ? [18, 60] : [14, 50], // 메인페이지에서도 큰 폰트 크기 사용
     fontFamily: "Pretendard, sans-serif",
     enableTooltip: false,
     deterministic: true,
@@ -303,7 +316,7 @@ const WordCloudContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: ${({ $isMainPage }) => $isMainPage ? '120px' : '180px'};
+  min-height: ${({ $isMainPage }) => $isMainPage ? '300px' : '180px'};
 `;
 
 const LoadingText = styled.div`

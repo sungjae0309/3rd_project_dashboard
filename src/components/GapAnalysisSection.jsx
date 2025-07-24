@@ -59,8 +59,8 @@ export default function GapAnalysisSection({ selectedJob, darkMode }) {
         
         if (!jobCategory) {
           if (isMounted) {
-            setError('관심 직무가 등록되어 있지 않습니다.');
-            setGapData([]);
+          setError('관심 직무가 등록되어 있지 않습니다.');
+          setGapData([]);
           }
           return;
         }
@@ -94,20 +94,20 @@ export default function GapAnalysisSection({ selectedJob, darkMode }) {
       } catch (error) {
         console.error('갭 분석 데이터 조회 실패:', error);
         if (isMounted) {
-          setError('데이터를 불러오는데 실패했습니다.');
-          // 임시 데이터
-          setGapData([
-            { skill: "React", gap_score: 85 },
-            { skill: "TypeScript", gap_score: 78 },
-            { skill: "Node.js", gap_score: 72 },
-            { skill: "Docker", gap_score: 68 },
-            { skill: "AWS", gap_score: 65 }
-          ]);
+        setError('데이터를 불러오는데 실패했습니다.');
+        // 임시 데이터
+        setGapData([
+          { skill: "React", gap_score: 85 },
+          { skill: "TypeScript", gap_score: 78 },
+          { skill: "Node.js", gap_score: 72 },
+          { skill: "Docker", gap_score: 68 },
+          { skill: "AWS", gap_score: 65 }
+        ]);
         }
       } finally {
         if (isMounted) {
-          setLoading(false);
-          setHasInitialized(true); // 초기화 완료
+        setLoading(false);
+        setHasInitialized(true); // 초기화 완료
         }
       }
     };

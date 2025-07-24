@@ -16,127 +16,73 @@ export const useUserData = () => {
 export const UserDataProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [desiredJob, setDesiredJob] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 로딩 상태는 하나로 관리
   const [error, setError] = useState(null);
   const [lastFetchTime, setLastFetchTime] = useState({ user: 0, desiredJob: 0 });
 
-  // 캐시 유효 시간 (5분)
-  const CACHE_DURATION = 5 * 60 * 1000;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
   const isCacheValid = (type) => {
-    const now = Date.now();
-    return (now - lastFetchTime[type]) < CACHE_DURATION;
+    return (Date.now() - lastFetchTime[type]) < CACHE_DURATION;
   };
 
   const fetchUserData = useCallback(async (force = false) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
       setUserData(null);
-      setLoading(false);
       return;
     }
 
-    // 캐시가 유효하고 강제 새로고침이 아닌 경우 기존 데이터 사용
     if (!force && userData && isCacheValid('user')) {
-      return userData;
+      return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${BASE_URL}/todo/user`, { headers });
+      // 1. API 주소를 '/me'로 수정
+      const response = await axios.get(`${BASE_URL}/me`, { headers });
       
-      if (response.data && response.data.data) {
-        setUserData(response.data.data);
-        setLastFetchTime(prev => ({ ...prev, user: Date.now() }));
-        setError(null);
-        return response.data.data;
-      }
+      setUserData(response.data);
+      setLastFetchTime(prev => ({ ...prev, user: Date.now() }));
+      setError(null);
     } catch (err) {
       console.error("사용자 데이터 조회 실패:", err);
       setError(err.message);
+      // 401 (Unauthorized) 오류 발생 시 사용자 데이터 초기화
+      if (err.response && err.response.status === 401) {
+        setUserData(null);
+      }
     } finally {
       setLoading(false);
     }
-  }, []); // 의존성 배열을 빈 배열로 설정하여 무한 루프 방지
+  }, [userData]); // 2. useCallback 의존성 배열 수정
 
   const fetchDesiredJob = useCallback(async (force = false) => {
-    // 캐시가 유효하고 강제 새로고침이 아닌 경우 기존 데이터 사용
     if (!force && desiredJob && isCacheValid('desiredJob')) {
-      return desiredJob;
+      return;
     }
 
     try {
-      // API 문서에 따르면 인증이 필요하지 않음
       const { data } = await axios.get(`${BASE_URL}/users/desired-job`);
-      
       setDesiredJob(data);
       setLastFetchTime(prev => ({ ...prev, desiredJob: Date.now() }));
-      setError(null);
-      return data;
     } catch (err) {
       console.error("희망 직무 조회 실패:", err);
       setError(err.message);
-      return null;
     }
-  }, []); // 의존성 배열을 빈 배열로 설정하여 무한 루프 방지
+  }, [desiredJob]); // 2. useCallback 의존성 배열 수정
 
-  // 초기 데이터 로드 - 컴포넌트 마운트 시 한 번만 실행
+  // 3. 초기 데이터 로드를 간결하게 수정
   useEffect(() => {
-    const initializeData = async () => {
-      const token = localStorage.getItem("accessToken");
-      
-      // userData는 토큰이 있을 때만 로드
-      if (token) {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          setUserData(null);
-          setLoading(false);
-          return;
-        }
-
-        try {
-          setLoading(true);
-          const headers = { Authorization: `Bearer ${token}` };
-          const response = await axios.get(`${BASE_URL}/todo/user`, { headers });
-          
-          if (response.data && response.data.data) {
-            setUserData(response.data.data);
-            setLastFetchTime(prev => ({ ...prev, user: Date.now() }));
-            setError(null);
-          }
-        } catch (err) {
-          console.error("사용자 데이터 조회 실패:", err);
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
-      }
-      
-      // desiredJob은 항상 로드 (인증 불필요)
-      try {
-        const { data } = await axios.get(`${BASE_URL}/users/desired-job`);
-        
-        setDesiredJob(data);
-        setLastFetchTime(prev => ({ ...prev, desiredJob: Date.now() }));
-        setError(null);
-      } catch (err) {
-        console.error("희망 직무 조회 실패:", err);
-        setError(err.message);
-      }
-    };
-
-    initializeData();
-  }, []); // 빈 배열로 변경하여 한 번만 실행
-
-  // 토큰 변경 감지 - userData만 토큰이 필요함
-  useEffect(() => {
+    // desiredJob은 토큰 유무와 상관없이 항상 조회
+    fetchDesiredJob();
+    // userData는 토큰이 있을 때만 조회
     const token = localStorage.getItem("accessToken");
-    if (!token) {
-      setUserData(null);
-      setLoading(false);
+    if (token) {
+      fetchUserData();
     }
-  }, []);
+  }, []); // 이 useEffect는 마운트 시 한 번만 실행됩니다.
 
   const refreshUserData = useCallback(() => {
     return fetchUserData(true);
@@ -162,4 +108,4 @@ export const UserDataProvider = ({ children }) => {
       {children}
     </UserDataContext.Provider>
   );
-}; 
+};

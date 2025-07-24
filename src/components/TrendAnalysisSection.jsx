@@ -504,23 +504,23 @@ export default function TrendAnalysisSection({ darkMode = false }) {
           </WordCloudContainer>
         );
       
-      case "trend":
-        return (
-          <TrendContainer>
-            <TrendTitle $darkMode={darkMode}>트렌드 분석 결과</TrendTitle>
-            <TrendList>
-              {skillData.map((item, index) => (
-                <TrendItem key={index} $darkMode={darkMode}>
-                  <SkillName $darkMode={darkMode}>{item.skill}</SkillName>
-                  <TrendData>
-                    <Count>{item.count}</Count>
-                    <TrendIcon>{getTrendIcon(item.trend)}</TrendIcon>
-                  </TrendData>
-                </TrendItem>
-              ))}
-            </TrendList>
-          </TrendContainer>
-        );
+      // case "trend":
+      //   return (
+      //     <TrendContainer>
+      //       <TrendTitle $darkMode={darkMode}>트렌드 분석 결과</TrendTitle>
+      //       <TrendList>
+      //         {skillData.map((item, index) => (
+      //           <TrendItem key={index} $darkMode={darkMode}>
+      //             <SkillName $darkMode={darkMode}>{item.skill}</SkillName>
+      //             <TrendData>
+      //               <Count>{item.count}</Count>
+      //           <TrendIcon>{getTrendIcon(item.trend)}</TrendIcon>
+      //             </TrendData>
+      //           </TrendItem>
+      //         ))}
+      //       </TrendList>
+      //     </TrendContainer>
+      //   );
       
       default:
         return <NoDataMessage>지원하지 않는 시각화 타입입니다.</NoDataMessage>;

@@ -30,9 +30,10 @@ import SavedJobs from "./SavedJobs";
 import AiJobRecommendation from "./AiJobRecommendation";
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
 import { useNavigate } from "react-router-dom";
+import TodoPreview from "./TodoPreview"; 
 
 import axios from "axios";
-import { fetchMcpResponse } from "../api/mcp";
+import { fetchMcpResponse, createChatSession, sendChatMessage } from "../api/mcp";
 import { useLocation } from "react-router-dom";
 import { useUserData } from "../contexts/UserDataContext";
 import { useRoadmap } from "../contexts/RoadmapContext";
@@ -127,13 +128,37 @@ export default function MainContent({
     };
   }, [token]);
 
-  // 새로고침 시 홈화면으로 이동하도록 수정
-  useEffect(() => {
-    // 새로고침 시 항상 홈화면으로 이동
-    setSelectedPage("dashboard");
-    // localStorage에서 저장된 페이지 정보 제거
-    localStorage.removeItem("currentPage");
-  }, []);
+  // maincontent.jsx
+
+// 컴포넌트 최상단 또는 다른 useEffect 근처에 추가
+
+// [수정 1] 페이지 로드 시, localStorage에서 마지막 페이지 상태를 '복원'
+useEffect(() => {
+  // 'lastSelectedPage'라는 키로 저장된 값을 불러옵니다.
+  const savedPage = localStorage.getItem('lastSelectedPage');
+  
+  // 저장된 페이지가 있으면 해당 페이지로 상태를 설정합니다.
+  if (savedPage) {
+    setSelectedPage(savedPage);
+  } else {
+    // 저장된 페이지가 없으면(첫 방문 등) 기본값인 'dashboard'로 설정합니다.
+    setSelectedPage('dashboard');
+  }
+  // 이 로직은 처음 한 번만 실행되면 되므로 의존성 배열은 비워둡니다.
+}, []); // [] 대신 [setSelectedPage]를 사용해도 무방합니다.
+
+// maincontent.jsx
+
+// 바로 이어서 추가
+
+// [수정 2] 페이지가 변경될 때마다 해당 상태를 localStorage에 '저장'
+useEffect(() => {
+  // selectedPage 상태가 변경될 때마다 'lastSelectedPage' 키로 값을 저장합니다.
+  // 사용자가 'search' 페이지에 있다가 새로고침하면, 1단계 로직이 이 값을 읽어 복원합니다.
+  localStorage.setItem('lastSelectedPage', selectedPage);
+}, [selectedPage]); // selectedPage가 바뀔 때마다 이 코드가 실행됩니다.
+
+
 
   // 페이지 변경 시 localStorage에 저장 - 홈화면이 아닐 때만 저장
   useEffect(() => {
@@ -223,12 +248,29 @@ export default function MainContent({
     setChatHistory((prev) => [...prev, { sender: "user", text: trimmed }]);
   
     try {
-      const res = await fetchMcpResponse(trimmed, userId, token);
-      const assistantMsg = res?.message || "⚠ 메시지 없음";
-      setChatHistory((prev) => [...prev, { sender: "assistant", text: assistantMsg }]);
+      // 1. 새 채팅 세션 생성
+      const sessionData = await createChatSession(token);
+      const newSessionId = sessionData.id;
+      
+      // 2. 첫 메시지 전송
+      const response = await sendChatMessage(newSessionId, trimmed, token);
+      
+      // 3. 채팅 페이지로 이동 (세션 ID와 함께)
+      setSelectedSession(newSessionId);
+      setSelectedPage("chat");
+      
     } catch (err) {
-      console.error("응답 오류:", err);
-      setChatHistory((prev) => [...prev, { sender: "assistant", text: "⚠ 서버 오류" }]);
+      console.error("채팅 세션 생성 실패:", err);
+      // 에러 처리 - 기존 방식으로 fallback
+      setChatHistory((prev) => [...prev, { sender: "user", text: trimmed }]);
+      try {
+        const res = await fetchMcpResponse(trimmed, userId, token);
+        const assistantMsg = res?.message || "⚠ 메시지 없음";
+        setChatHistory((prev) => [...prev, { sender: "assistant", text: assistantMsg }]);
+      } catch (fallbackErr) {
+        console.error("fallback 응답 오류:", fallbackErr);
+        setChatHistory((prev) => [...prev, { sender: "assistant", text: "⚠ 서버 오류" }]);
+      }
     }
   };
   
@@ -310,11 +352,10 @@ export default function MainContent({
           onShowReason={setSelectedReasonJob}
         />
        
-        <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", padding: "1.5rem 1.8rem 1rem", gap: "0.8rem", position: "relative", minHeight: "450px", maxHeight: "450px", overflow: "hidden" }}>
-            <CardIconBg><FaClipboardCheck /></CardIconBg>
-            <SectionTitle style={{ fontSize: "1.7rem", marginTop: "-0.5rem" }}><HighlightBar /><span>To-do List</span></SectionTitle>
-            <TodoList darkMode={darkMode} onPage="todo" />
-        </HoverCard>
+        
+{/* HoverCard 태그 자체를 TodoPreview 컴포넌트로 교체합니다. */}
+<TodoPreview darkMode={darkMode} setSelectedPage={setSelectedPage} />
+
         </MainCards>
         <SingleCard>
         <HoverCard $darkMode={darkMode} style={{ flexDirection: "column", alignItems: "flex-start", padding: "1.8rem 1.5rem", minHeight: "480px", maxHeight: "480px", overflow: "hidden" }}>
@@ -371,6 +412,7 @@ export default function MainContent({
                             selectedFieldType={selectedFieldType}
                             isMainPage={true} // 메인페이지임을 표시
                             key={`${selectedJob}-${selectedFieldType}`}
+
                           />
                         </MiniWordCloudPreview>
                       </>
@@ -662,7 +704,14 @@ export default function MainContent({
             />
           )}
           {selectedPage === "history" && (
-            <ChatSessionsList token={token} darkMode={darkMode} onSelect={(id) => { setSelectedSession(id); setSelectedPage("chat"); }} />
+            <ChatSessionsList 
+              token={token} 
+              darkMode={darkMode} 
+              onSelect={(id) => { 
+                setSelectedSession(Number(id)); // 숫자로 확실히 변환
+                setSelectedPage("chat"); 
+              }} 
+            />
           )}
           {selectedPage === "chat" && (
             <ChatPage sessionId={selectedSession} token={token} darkMode={darkMode} onNewSession={(newId) => { setSelectedSession(newId); }} />
@@ -925,7 +974,7 @@ const Scrollable = styled.div`
 
 const MainCards = styled.div`
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 1.8fr 1fr;
   gap: 2rem;
   margin-bottom: 2rem;
   align-items: stretch;
