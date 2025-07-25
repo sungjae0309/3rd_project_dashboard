@@ -108,12 +108,11 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
             uniqueSkills: 0,
             peakSkill: { skill: '없음', count: 0 },
             topMover: { skill: '없음', increase: 0 },
+            topDownwardMover: { skill: '없음', decrease: 0 }, 
             avgFrequency: 0
         };
     }
 
-    // 1. 분석 기술 수
-    const uniqueSkills = new Set(skillData.map(d => d.skill)).size;
 
     // 2. 최고점 기술
     const peakSkill = skillData.reduce((max, item) => 
@@ -129,21 +128,29 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     });
 
     let topMover = { skill: '없음', increase: -Infinity };
+    let topDownwardMover = { skill: '없음', decrease: Infinity }; 
     skillsMap.forEach((points, skill) => {
-        if (points.length > 1) {
-            points.sort((a, b) => a.date - b.date);
-            const increase = points[points.length - 1].count - points[0].count;
-            if (increase > topMover.increase) {
-                topMover = { skill, increase };
-            }
-        }
-    });
+      if (points.length > 1) {
+          points.sort((a, b) => a.date - b.date);
+          const change = points[points.length - 1].count - points[0].count;
+
+          // 기존 상승세 기술 로직
+          if (change > topMover.increase) {
+              topMover = { skill, increase: change };
+          }
+          
+          // ▼▼ 하락세 기술 찾는 로직 추가 (가장 큰 음수 값)
+          if (change < topDownwardMover.decrease) {
+              topDownwardMover = { skill, decrease: change };
+          }
+      }
+  });
 
     // 4. 평균 빈도수
     const totalCount = skillData.reduce((sum, item) => sum + item.count, 0);
     const avgFrequency = Math.round(totalCount / skillData.length);
 
-    return { uniqueSkills, peakSkill, topMover, avgFrequency };
+    return { peakSkill, topMover, topDownwardMover, avgFrequency };
 
 }, [skillData]);
 
@@ -168,7 +175,7 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
     
     const fetchJobNamesAndSetUserJob = async () => {
       try {
-        const response = await axios.get(`${BASE_URL}/job-skills/job-names/with-posts`);
+        const response = await axios.get(`${BASE_URL}/job-role/job-names/with-posts`);
         if (isMounted) {
           const jobList = response.data.map(job => job.name);
           setJobNames(jobList);
@@ -382,6 +389,40 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
   }, [isInitialized, selectedTrendJob, selectedField, visualizationType, startWeek, endWeek, year]);
 
 
+  // 갭 분석 결과를 파싱하고 포맷팅하는 함수
+  const formatGapResult = (result) => {
+    if (!result) return "";
+    
+    console.log('🔍 [CareerRoadmapMain] formatGapResult 입력값:', result);
+    console.log('🔍 [CareerRoadmapMain] formatGapResult 입력값 길이:', result.length);
+    
+    let formatted = result;
+    
+    // 방법 1: eval을 사용한 처리 (가장 확실한 방법)
+    try {
+      // eval을 사용하여 문자열 리터럴로 처리
+      formatted = eval(`"${result}"`);
+      console.log('🔍 [CareerRoadmapMain] eval 성공:', formatted);
+    } catch (e) {
+      console.log('🔍 [CareerRoadmapMain] eval 실패:', e);
+      
+      // 방법 2: 직접 replace (모든 경우 처리)
+      formatted = result
+        .replace(/\\n/g, '\n')
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\r/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+      
+      console.log('🔍 [CareerRoadmapMain] 직접 replace 사용:', formatted);
+    }
+    
+    console.log('🔍 [CareerRoadmapMain] 최종 결과:', formatted);
+    console.log('🔍 [CareerRoadmapMain] 최종 결과 길이:', formatted.length);
+    
+    return formatted.trim();
+  };
+
   // 4. 갭 분석 데이터 fetch (selectedGapJob 기준) - 초기화 완료 후에만 실행
   const fetchGapAnalysis = async () => {
     if (!selectedGapJob) return;
@@ -401,7 +442,10 @@ export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, r
       });
       
       const data = response.data;
-      setGapResult(data.gap_result);
+      
+      // 결과를 포맷팅하여 설정
+      const formattedResult = formatGapResult(data.gap_result);
+      setGapResult(formattedResult);
       setTopSkills(data.top_skills);
       
       console.log('✅ [CareerRoadmapMain] 갭 분석 완료 (캐시 활용):', data);
@@ -826,16 +870,18 @@ const fetchRecommendedRoadmaps = async () => {
   };
 
   // 고유한 기술 개수 계산 함수
-  const getUniqueSkillsCount = () => {
-    console.log('🔍 [getUniqueSkillsCount] skillData:', skillData);
-    if (!skillData || !Array.isArray(skillData)) {
-      console.log('❌ [getUniqueSkillsCount] 유효하지 않은 데이터');
-      return 0;
-    }
-    const count = skillData.length;
-    console.log('✅ [getUniqueSkillsCount] 결과:', count);
-    return count;
-  };
+// 고유한 기술 개수 계산 함수
+const getUniqueSkillsCount = () => {
+  console.log('🔍 [getUniqueSkillsCount] skillData:', skillData);
+  if (!skillData || !Array.isArray(skillData)) {
+    console.log('❌ [getUniqueSkillsCount] 유효하지 않은 데이터');
+    return 0;
+  }
+  // 현재 이 부분에서 배열의 전체 길이를 반환하여 문제가 발생합니다.
+  const count = skillData.length; 
+  console.log('✅ [getUniqueSkillsCount] 결과:', count);
+  return count;
+};
 
   // 최고 인기 기술의 점유율 계산 함수
   const getTopSkillPercentage = () => {
@@ -991,7 +1037,7 @@ const fetchRecommendedRoadmaps = async () => {
         <CompactControlPanel $darkMode={darkMode}>
           <ControlGroup>
             <ControlLabel $darkMode={darkMode}>
-              <FaChartLine />
+              <FaUserTie />
               직무 선택
             </ControlLabel>
             <Select 
@@ -1308,30 +1354,40 @@ const fetchRecommendedRoadmaps = async () => {
               case 'trend':
                 // if 조건을 제거하여 데이터가 없을 때도 요약 정보 창이 항상 표시되도록 합니다.
                 // trendStats가 데이터가 없을 때 기본값을 반환하므로 안전합니다.
-                return (
-                  <QuickStats $darkMode={darkMode}>
-                    <StatItem title="차트에 표시된 고유 기술의 총 개수">
-                      <StatIcon><FaHashtag /></StatIcon>
-                      <StatValue>{trendStats.uniqueSkills}</StatValue>
-                      <StatLabel $darkMode={darkMode}>분석 기술 수</StatLabel>
-                    </StatItem>
-                    <StatItem title={`기간 내 가장 높은 빈도를 기록한 기술: ${trendStats.peakSkill.skill} (${trendStats.peakSkill.count}회)`}>
-                      <StatIcon><FaStar /></StatIcon>
-                      <StatValue>{trendStats.peakSkill.skill}</StatValue>
-                      <StatLabel $darkMode={darkMode}>최고점 기술</StatLabel>
-                    </StatItem>
-                    <StatItem title={`기간 내 빈도수가 가장 많이 증가한 기술 (+${trendStats.topMover.increase})`}>
-                      <StatIcon><FaChartLine /></StatIcon>
-                      <StatValue>{trendStats.topMover.increase > 0 ? trendStats.topMover.skill : '없음'}</StatValue>
-                      <StatLabel $darkMode={darkMode}>상승세 기술</StatLabel>
-                    </StatItem>
-                    <StatItem title="모든 데이터 포인트의 평균 빈도수">
-                      <StatIcon><FaChartBar /></StatIcon>
-                      <StatValue>{trendStats.avgFrequency}</StatValue>
-                      <StatLabel $darkMode={darkMode}>평균 빈도수</StatLabel>
-                    </StatItem>
-                  </QuickStats>
-                );
+                case 'trend':
+  return (
+    <QuickStats $darkMode={darkMode}>
+      
+      
+      {/* 최고점 기술 (기존과 동일) */}
+      <StatItem title={`기간 내 가장 높은 빈도를 기록한 기술: ${trendStats.peakSkill.skill} (${trendStats.peakSkill.count}회)`}>
+        <StatIcon><FaStar /></StatIcon>
+        <StatValue>{trendStats.peakSkill.skill}</StatValue>
+        <StatLabel $darkMode={darkMode}>최고점 기술</StatLabel>
+      </StatItem>
+      
+      {/* 상승세 기술 (기존과 동일) */}
+      <StatItem title={`기간 내 빈도수가 가장 많이 증가한 기술 (+${trendStats.topMover.increase})`}>
+        <StatIcon><FaChartLine /></StatIcon>
+        <StatValue>{trendStats.topMover.increase > 0 ? trendStats.topMover.skill : '없음'}</StatValue>
+        <StatLabel $darkMode={darkMode}>상승세 기술</StatLabel>
+      </StatItem>
+
+      {/* ▼▼ '분석 기술 수' 대신 '하락세 기술'을 표시하도록 수정 ▼▼ */}
+      <StatItem title={`기간 내 빈도수가 가장 많이 감소한 기술 (${trendStats.topDownwardMover.decrease})`}>
+        <StatIcon><FaArrowDown /></StatIcon>
+        <StatValue>{trendStats.topDownwardMover.decrease < 0 ? trendStats.topDownwardMover.skill : '없음'}</StatValue>
+        <StatLabel $darkMode={darkMode}>하락세 기술</StatLabel>
+      </StatItem>
+      
+      {/* 평균 빈도수 (기존과 동일) */}
+      <StatItem title="모든 데이터 포인트의 평균 빈도수">
+        <StatIcon><FaChartBar /></StatIcon>
+        <StatValue>{trendStats.avgFrequency}</StatValue>
+        <StatLabel $darkMode={darkMode}>평균 빈도수</StatLabel>
+      </StatItem>
+    </QuickStats>
+  );
 
                 case 'weekly_comparison':
                   // if 조건을 제거하여 데이터 조회 전에도 기본값이 표시되도록 합니다.
@@ -1652,36 +1708,35 @@ const fetchRecommendedRoadmaps = async () => {
       </ScrollArrow>
 
       {/* ───────────── 갭 분석 ───────────── */}
-      <SectionCard id="gap-analysis-section">
+      <SectionCard id="gap-analysis-section" style={{ minHeight: 'auto', padding: '1.2rem 1.8rem' }}>
         <GapHeader>
           <div>
             <Title>갭 분석</Title>
             <ShortDesc>내 이력서와 공고를 비교합니다.</ShortDesc>
           </div>
-          <InsightsButton onClick={() => setShowGapInsightsPopup(true)}>
-            인사이트
-          </InsightsButton>
         </GapHeader>
 
         <Divider />
 
         <GapControlRow>
-          <ControlLabel $darkMode={darkMode}>
-            <FaUserTie />
-            분석 직무
-          </ControlLabel>
-          <Select
-            $darkMode={darkMode}
-            value={selectedGapJob}
-            onChange={(e) => setSelectedGapJob(e.target.value)}
-            style={{ width: "200px" }}
-          >
-            {jobNames.map((job) => (
-              <option key={job} value={job}>
-                {job}
-              </option>
-            ))}
-          </Select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <ControlLabel $darkMode={darkMode}>
+              <FaUserTie />
+              직무 선택
+            </ControlLabel>
+            <Select
+              $darkMode={darkMode}
+              value={selectedGapJob}
+              onChange={(e) => setSelectedGapJob(e.target.value)}
+              style={{ width: "200px" }}
+            >
+              {jobNames.map((job) => (
+                <option key={job} value={job}>
+                  {job}
+                </option>
+              ))}
+            </Select>
+          </div>
         </GapControlRow>
 
         <GapResultArea>
@@ -1718,138 +1773,132 @@ const fetchRecommendedRoadmaps = async () => {
 
       {/* ───────────── 극복 방안 ───────────── */}
       <SectionCard id="overcome-plan-section">
-        <OvercomeHeader>
-          <Title>극복 방안</Title>
-          <Text>
-            부족한 역량을 채우기 위한 맞춤형 부트캠프와 강의를 추천해드립니다.
-          </Text>
-        </OvercomeHeader>
+        <HeaderSection $darkMode={darkMode}>
+          <HeaderLeft>
+            <Title>극복 방안</Title>
+            <Subtitle $darkMode={darkMode}>
+              부족한 역량을 채우기 위한 맞춤형 부트캠프와 강의를 추천해드립니다.
+            </Subtitle>
+          </HeaderLeft>
+        </HeaderSection>
         
-        <OvercomeContent>
-          {/* 직무 선택 섹션 */}
-          <JobSelectionSection $darkMode={darkMode}>
-            <JobSelectionHeader>
-              <JobSelectionTitle>직무 선택</JobSelectionTitle>
-              <JobSelectionSubtitle $darkMode={darkMode}>
-                선택한 직무에 맞는 부트캠프와 강의를 추천해드립니다.
-              </JobSelectionSubtitle>
-            </JobSelectionHeader>
-            <JobSelectionControls>
-              <JobSelect 
-                value={selectedTrendJob} 
-                onChange={(e) => setSelectedTrendJob(e.target.value)}
-                $darkMode={darkMode}
-              >
-                {jobNames.map((job) => (
-                  <option key={job} value={job}>{job}</option>
-                ))}
-              </JobSelect>
-              <RefreshButton onClick={fetchRecommendedRoadmaps} $darkMode={darkMode}>
-                <FaFilter />
-                추천 새로고침
-              </RefreshButton>
-            </JobSelectionControls>
-          </JobSelectionSection>
+        <CompactControlPanel $darkMode={darkMode}>
+          <ControlGroup>
+            <ControlLabel $darkMode={darkMode}>
+              <FaUserTie />
+              직무 선택
+            </ControlLabel>
+            <Select 
+              $darkMode={darkMode}
+              value={selectedTrendJob} 
+              onChange={(e) => setSelectedTrendJob(e.target.value)}
+              style={{ width: "200px" }}
+            >
+              {jobNames.map((job) => (
+                <option key={job} value={job}>{job}</option>
+              ))}
+            </Select>
+          </ControlGroup>
+        </CompactControlPanel>
 
-          {/* 부트캠프와 강의 섹션을 나란히 배치 */}
-          <OvercomeSectionsContainer>
-            {/* 부트캠프 섹션 */}
-            <OvercomeSection $darkMode={darkMode}>
-              <OvercomeSectionHeader $darkMode={darkMode}>
-                <OvercomeHeaderLeft>
-                  <OvercomeIconWrapper $darkMode={darkMode}>
-                    <OvercomeIcon>🎓</OvercomeIcon>
-                  </OvercomeIconWrapper>
-                  <OvercomeTitle $darkMode={darkMode}>부트캠프</OvercomeTitle>
-                </OvercomeHeaderLeft>
-                <OvercomeCount $darkMode={darkMode}>{recommendedRoadmaps.bootcamps.length}개 추천</OvercomeCount>
-              </OvercomeSectionHeader>
-              <OvercomeItemList>
-                {recommendationLoading ? (
-                  <LoadingText $darkMode={darkMode}>추천 로드맵 로딩 중...</LoadingText>
-                ) : recommendedRoadmaps.bootcamps.length > 0 ? (
-                  recommendedRoadmaps.bootcamps.map((item, index) => (
-                    <OvercomeItem 
-                      key={index} 
-                      onClick={() => handleOvercomeItemClick(item)}
-                    >
-                      <OvercomeItemContent>
-                        <OvercomeItemTitle>{item.name}</OvercomeItemTitle>
-                        <OvercomeItemCompany>{item.company}</OvercomeItemCompany>
-                      </OvercomeItemContent>
-                      <OvercomeItemActions>
-                        <OvercomeSaveButton
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleSave(item.id);
-                          }}
-                          $isSaved={savedRoadmapIds.has(item.id)}
-                        >
-                          {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
-                        </OvercomeSaveButton>
-                        <OvercomeItemArrow>→</OvercomeItemArrow>
-                      </OvercomeItemActions>
-                    </OvercomeItem>
-                  ))
-                ) : (
-                  <NoDataText $darkMode={darkMode}>추천 부트캠프가 없습니다.</NoDataText>
-                )}
-              </OvercomeItemList>
-              <OvercomeViewAllButton onClick={() => setSelectedPage("roadmap-bootcamps")}>
-                <OvercomeButtonIcon>📋</OvercomeButtonIcon>
-                전체 부트캠프 목록 보기
-              </OvercomeViewAllButton>
-            </OvercomeSection>
+        {/* 부트캠프와 강의 섹션을 나란히 배치 */}
+        <OvercomeSectionsContainer>
+          {/* 부트캠프 섹션 */}
+          <OvercomeSection $darkMode={darkMode}>
+            <OvercomeSectionHeader $darkMode={darkMode}>
+              <OvercomeHeaderLeft>
+                <OvercomeIconWrapper $darkMode={darkMode}>
+                  <OvercomeIcon>🎓</OvercomeIcon>
+                </OvercomeIconWrapper>
+                <OvercomeTitle $darkMode={darkMode}>부트캠프</OvercomeTitle>
+              </OvercomeHeaderLeft>
+              <OvercomeCount $darkMode={darkMode}>{recommendedRoadmaps.bootcamps.length}개 추천</OvercomeCount>
+            </OvercomeSectionHeader>
+            <OvercomeItemList>
+              {recommendationLoading ? (
+                <LoadingText $darkMode={darkMode}>추천 로드맵 로딩 중...</LoadingText>
+              ) : recommendedRoadmaps.bootcamps.length > 0 ? (
+                recommendedRoadmaps.bootcamps.map((item, index) => (
+                  <OvercomeItem 
+                    key={index} 
+                    onClick={() => handleOvercomeItemClick(item)}
+                  >
+                    <OvercomeItemContent>
+                      <OvercomeItemTitle>{item.name}</OvercomeItemTitle>
+                      <OvercomeItemCompany>{item.company}</OvercomeItemCompany>
+                    </OvercomeItemContent>
+                    <OvercomeItemActions>
+                      <OvercomeSaveButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSave(item.id);
+                        }}
+                        $isSaved={savedRoadmapIds.has(item.id)}
+                      >
+                        {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
+                      </OvercomeSaveButton>
+                      <OvercomeItemArrow>→</OvercomeItemArrow>
+                    </OvercomeItemActions>
+                  </OvercomeItem>
+                ))
+              ) : (
+                <NoDataText $darkMode={darkMode}>추천 부트캠프가 없습니다.</NoDataText>
+              )}
+            </OvercomeItemList>
+            <OvercomeViewAllButton onClick={() => setSelectedPage("roadmap-bootcamps")}>
+              <OvercomeButtonIcon>📋</OvercomeButtonIcon>
+              전체 부트캠프 목록 보기
+            </OvercomeViewAllButton>
+          </OvercomeSection>
 
-            {/* 강의 섹션 */}
-            <OvercomeSection $darkMode={darkMode}>
-              <OvercomeSectionHeader $darkMode={darkMode}>
-                <OvercomeHeaderLeft>
-                  <OvercomeIconWrapper $darkMode={darkMode}>
-                    <OvercomeIcon>📚</OvercomeIcon>
-                  </OvercomeIconWrapper>
-                  <OvercomeTitle $darkMode={darkMode}>강의</OvercomeTitle>
-                </OvercomeHeaderLeft>
-                <OvercomeCount $darkMode={darkMode}>{recommendedRoadmaps.courses.length}개 추천</OvercomeCount>
-              </OvercomeSectionHeader>
-              <OvercomeItemList>
-                {recommendationLoading ? (
-                  <LoadingText $darkMode={darkMode}>추천 로드맵 로딩 중...</LoadingText>
-                ) : recommendedRoadmaps.courses.length > 0 ? (
-                  recommendedRoadmaps.courses.map((item, index) => (
-                    <OvercomeItem 
-                      key={index}
-                      onClick={() => handleOvercomeItemClick(item)}
-                    >
-                      <OvercomeItemContent>
-                        <OvercomeItemTitle>{item.name}</OvercomeItemTitle>
-                        <OvercomeItemCompany>{item.company}</OvercomeItemCompany>
-                      </OvercomeItemContent>
-                      <OvercomeItemActions>
-                        <OvercomeSaveButton
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleSave(item.id);
-                          }}
-                          $isSaved={savedRoadmapIds.has(item.id)}
-                        >
-                          {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
-                        </OvercomeSaveButton>
-                        <OvercomeItemArrow>→</OvercomeItemArrow>
-                      </OvercomeItemActions>
-                    </OvercomeItem>
-                  ))
-                ) : (
-                  <NoDataText $darkMode={darkMode}>추천 강의가 없습니다.</NoDataText>
-                )}
-              </OvercomeItemList>
-              <OvercomeViewAllButton onClick={() => setSelectedPage("roadmap-courses")}>
-                <OvercomeButtonIcon>📋</OvercomeButtonIcon>
-                전체 강의 목록 보기
-              </OvercomeViewAllButton>
-            </OvercomeSection>
-          </OvercomeSectionsContainer>
-        </OvercomeContent>
+          {/* 강의 섹션 */}
+          <OvercomeSection $darkMode={darkMode}>
+            <OvercomeSectionHeader $darkMode={darkMode}>
+              <OvercomeHeaderLeft>
+                <OvercomeIconWrapper $darkMode={darkMode}>
+                  <OvercomeIcon>📚</OvercomeIcon>
+                </OvercomeIconWrapper>
+                <OvercomeTitle $darkMode={darkMode}>강의</OvercomeTitle>
+              </OvercomeHeaderLeft>
+              <OvercomeCount $darkMode={darkMode}>{recommendedRoadmaps.courses.length}개 추천</OvercomeCount>
+            </OvercomeSectionHeader>
+            <OvercomeItemList>
+              {recommendationLoading ? (
+                <LoadingText $darkMode={darkMode}>추천 로드맵 로딩 중...</LoadingText>
+              ) : recommendedRoadmaps.courses.length > 0 ? (
+                recommendedRoadmaps.courses.map((item, index) => (
+                  <OvercomeItem 
+                    key={index}
+                    onClick={() => handleOvercomeItemClick(item)}
+                  >
+                    <OvercomeItemContent>
+                      <OvercomeItemTitle>{item.name}</OvercomeItemTitle>
+                      <OvercomeItemCompany>{item.company}</OvercomeItemCompany>
+                    </OvercomeItemContent>
+                    <OvercomeItemActions>
+                      <OvercomeSaveButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSave(item.id);
+                        }}
+                        $isSaved={savedRoadmapIds.has(item.id)}
+                      >
+                        {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
+                      </OvercomeSaveButton>
+                      <OvercomeItemArrow>→</OvercomeItemArrow>
+                    </OvercomeItemActions>
+                  </OvercomeItem>
+                ))
+              ) : (
+                <NoDataText $darkMode={darkMode}>추천 강의가 없습니다.</NoDataText>
+              )}
+            </OvercomeItemList>
+            <OvercomeViewAllButton onClick={() => setSelectedPage("roadmap-courses")}>
+              <OvercomeButtonIcon>📋</OvercomeButtonIcon>
+              전체 강의 목록 보기
+            </OvercomeViewAllButton>
+          </OvercomeSection>
+        </OvercomeSectionsContainer>
       </SectionCard>
 
 
@@ -2223,7 +2272,8 @@ const Text = styled.p`
 
 // 극복 방안 스타일 컴포넌트들
 const OvercomeHeader = styled.div`
-  margin-bottom: 2rem;
+  text-align: center; /* 텍스트 중앙 정렬 */
+  margin-bottom: 2.5rem; /* 하단 여백 증가 */
 `;
 
 const OvercomeContent = styled.div`
@@ -2234,27 +2284,26 @@ const OvercomeContent = styled.div`
 
 const OvercomeSectionsContainer = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  /* 화면이 좁아지면 세로로 배치되도록 수정 */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
   margin-top: 1rem;
 `;
 
 const OvercomeSection = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.8rem;
   background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#fff")};
   border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
-  border-radius: 1rem;
-  padding: 1.5rem;
+  border-radius: 0.8rem;
+  padding: 1.5rem; /* 내부 여백 축소 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
-  max-height: 400px;
-  overflow: hidden;
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   }
 `;
 
@@ -2262,80 +2311,90 @@ const OvercomeSectionHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 0.8rem;
+  padding-bottom: 0.8rem; /* 하단 여백 축소 */
   border-bottom: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
 `;
 
 const OvercomeHeaderLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.6rem;
 `;
 
 const OvercomeIconWrapper = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  background: linear-gradient(135deg, #ffa500, #ff8c00);
+  width: 2.2rem;  /* 아이콘 배경 크기 축소 */
+  height: 2.2rem;
+  background: ${({ $darkMode }) => $darkMode ? "rgba(255, 165, 0, 0.15)" : "rgba(255, 165, 0, 0.1)"};
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(255, 165, 0, 0.3);
 `;
 
 const OvercomeIcon = styled.div`
-  font-size: 1.2rem;
+  font-size: 1.1rem; /* 아이콘 크기 축소 */
 `;
 
 const OvercomeTitle = styled.h4`
-  font-size: 1.2rem;
+  font-size: 1.1rem; /* 제목 폰트 크기 축소 */
   font-weight: 700;
   color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
   margin: 0;
 `;
 
 const OvercomeCount = styled.span`
-  background: linear-gradient(135deg, #28a745, #20c997);
-  color: #fff;
-  padding: 0.3rem 0.8rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#1e40af" : "#3b82f6")};
+  color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#fff")};
+  padding: 0.3rem 0.7rem;
   border-radius: 0.8rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 `;
 
 const OvercomeItemList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  flex: 1;
-  overflow-y: auto;
-  max-height: 200px;
+  max-height: 200px; /* 최대 높이를 더 줄임 - 약 2-3개 아이템이 보이도록 */
+  overflow-y: auto; /* 내용이 많아지면 스크롤 */
+  padding-right: 0.5rem; /* 스크롤바 공간 확보 */
   
   &::-webkit-scrollbar {
-    width: 4px;
+    width: 8px;
   }
   &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 2px;
+    background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f1f1f1'};
+    border-radius: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 165, 0, 0.3);
-    border-radius: 2px;
+    background: ${({ $darkMode }) => $darkMode ? '#555' : '#c1c1c1'};
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${({ $darkMode }) => $darkMode ? '#666' : '#a8a8a8'};
+  }
+  
+  /* 스크롤바가 있을 때만 패딩 적용 */
+  &:hover {
+    padding-right: 0.5rem;
   }
 `;
 
 const OvercomeItem = styled.div`
-  background: ${({ $darkMode }) => ($darkMode ? "#333" : "#f8f9fa")};
+  background: ${({ $darkMode }) => ($darkMode ? "rgba(255, 255, 255, 0.05)" : "transparent")};
   border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
-  border-radius: 0.6rem;
-  padding: 0.8rem;
+  border-radius: 0.6rem; /* 더 둥글게 */
+  padding: 0.8rem 1rem; /* 패딩 축소 */
   cursor: pointer;
   transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   
   &:hover {
-    background: ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
-    transform: translateX(4px);
+    border-color: #ffa500;
+    background: ${({ $darkMode }) => ($darkMode ? "rgba(255, 165, 0, 0.1)" : "rgba(255, 165, 0, 0.05)")};
   }
 `;
 
@@ -2343,47 +2402,46 @@ const OvercomeItemContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  flex: 1;
+  min-width: 0; /* flex 내부에서 text-overflow가 잘 동작하도록 설정 */
 `;
 
 const OvercomeItemTitle = styled.div`
-  font-size: 0.9rem;
+  font-size: 1rem; /* 폰트 크기 조정 */
   font-weight: 600;
   color: ${({ $darkMode }) => ($darkMode ? "#fff" : "#333")};
-  line-height: 1.3;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `;
 
 const OvercomeItemCompany = styled.div`
-  font-size: 0.8rem;
+  font-size: 0.85rem; /* 폰트 크기 조정 */
   color: ${({ $darkMode }) => ($darkMode ? "#ccc" : "#666")};
-`;
-
-const OvercomeItemArrow = styled.div`
-  font-size: 1rem;
-  color: #ffa500;
-  font-weight: bold;
-  margin-left: 0.5rem;
 `;
 
 const OvercomeItemActions = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
 `;
 
 const OvercomeSaveButton = styled.button`
   background: none;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   cursor: pointer;
   padding: 0.3rem;
-  border-radius: 0.3rem;
+  border-radius: 50%; /* 원형으로 변경 */
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   
   &:hover {
     transform: scale(1.1);
+    background: ${({ $darkMode }) => $darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"};
   }
   
   ${({ $isSaved }) => $isSaved && css`
@@ -2397,30 +2455,51 @@ const OvercomeSaveButton = styled.button`
   }
 `;
 
+const OvercomeItemArrow = styled.div`
+  font-size: 1.2rem;
+  color: ${({ $darkMode }) => $darkMode ? "#777" : "#ccc"};
+  font-weight: bold;
+`;
+
 const OvercomeViewAllButton = styled.button`
-  background: linear-gradient(135deg, #ffa500, #ff8c00);
-  color: #fff;
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 0.6rem;
-  font-size: 0.8rem;
+  background: transparent;
+  color: ${({ $darkMode }) => $darkMode ? "#ffa500" : "#333"};
+  border: 1px solid ${({ $darkMode }) => $darkMode ? "#444" : "#ddd"};
+  padding: 0.8rem 1.2rem; /* 버튼 크기 조정 */
+  border-radius: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
-  align-self: flex-start;
+  align-self: center; /* 버튼을 중앙에 배치 */
+  margin-top: auto; /* 목록 아래에 고정되도록 */
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  box-shadow: 0 2px 8px rgba(255, 165, 0, 0.2);
+  gap: 0.5rem;
   
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+    background: ${({ $darkMode }) => $darkMode ? "#ffa500" : "#333"};
+    color: ${({ $darkMode }) => $darkMode ? "#333" : "#fff"};
+    border-color: transparent;
   }
 `;
 
 const OvercomeButtonIcon = styled.span`
-  font-size: 0.9rem;
+  font-size: 1rem;
+`;
+
+// 직무 선택 영역 스타일
+const JobSelectionSection = styled.div`
+  margin-bottom: 1rem; /* 하단 여백 감소 */
+  padding: 1.5rem 2rem;
+  background: ${({ $darkMode }) => ($darkMode ? "#2a2a2a" : "#fff")};
+  border: 1px solid ${({ $darkMode }) => ($darkMode ? "#444" : "#e9ecef")};
+  border-radius: 1rem;
+  display: flex;
+  flex-wrap: wrap; /* 화면이 좁아지면 줄바꿈 */
+  justify-content: center; /* 중앙 정렬 */
+  align-items: center;
+  gap: 1rem 2rem;
 `;
 
 const RoadmapCardsContainer = styled.div`
@@ -3417,9 +3496,9 @@ const GapHeader = styled.div`
 `;
 
 const ShortDesc = styled.div`
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #888;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0; /* 0.5rem에서 0으로 변경하여 여백 제거 */
 `;
 
 const Divider = styled.hr`
@@ -3461,12 +3540,16 @@ const StyledGapResult = styled.div`
   font-size: 1.08rem;
   color: #333;
   line-height: 1.8;
+  white-space: pre-wrap !important;
+  word-wrap: break-word;
+  word-break: break-word;
   box-shadow: 0 2px 8px rgba(255, 193, 7, 0.08);
   min-height: 120px;
   max-height: 320px;
   overflow-y: auto;
   margin-top: 0.5rem;
-  word-break: keep-all;
+  overflow-wrap: break-word;
+  hyphens: auto;
 `;
 
 const GapHeadline = styled.div`
@@ -3540,9 +3623,7 @@ const LoadingText = styled.div`
   margin-top: 0.5rem;
 `;
 
-const JobSelectionSection = styled.div`
-  margin-bottom: 2rem;
-`;
+
 
 const JobSelectionHeader = styled.div`
   margin-bottom: 1rem;

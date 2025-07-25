@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styled, { css } from "styled-components";
 import {
   FaBullseye,
@@ -9,7 +9,8 @@ import {
   FaTimes,
   FaHistory,
   FaHome,
-  FaComments
+  FaComments,
+  FaChevronRight
 } from "react-icons/fa";
 import { IoIosArrowDown } from "react-icons/io";
 
@@ -22,6 +23,31 @@ export default function Sidebar({
 }) {
   const [careerOpen, setCareerOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(true);
+  const [tooltip, setTooltip] = useState({ show: false, text: '', x: 0, y: 0 });
+
+  // 사이드바가 펼쳐질 때 토글 상태를 열린 상태로 설정
+  useEffect(() => {
+    if (!collapsed) {
+      setCareerOpen(true);
+      setSearchOpen(true);
+    }
+  }, [collapsed]);
+
+  // 커스텀 툴팁 함수들
+  const showTooltip = (text, event) => {
+    if (!collapsed) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({
+      show: true,
+      text,
+      x: rect.right + 10,
+      y: rect.top + rect.height / 2
+    });
+  };
+
+  const hideTooltip = () => {
+    setTooltip({ show: false, text: '', x: 0, y: 0 });
+  };
 
   const careerSubpages = [
     { key: "career-summary", label: "종합" },
@@ -68,29 +94,52 @@ export default function Sidebar({
   return (
     <Wrapper $darkMode={darkMode} collapsed={collapsed}>
       <TopBar>
-        <Logo onClick={() => setSelectedPage("aijob")}>
-          <LogoText collapsed={collapsed}>JOB</LogoText>
-          <span style={{ color: "#fff" }}>자</span>
+        <Logo onClick={() => setSelectedPage("aijob")} collapsed={collapsed}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <LogoText collapsed={collapsed}>JOB</LogoText>
+            <LogoText collapsed={collapsed} style={{ color: "#fff" }}>자</LogoText>
+          </div>
+          <LogoSubtitle collapsed={collapsed} $darkMode={darkMode}>
+            당신의 취업 여정에 함께하겠습니다
+          </LogoSubtitle>
         </Logo>
         <CollapseBtn onClick={() => setCollapsed(!collapsed)} $darkMode={darkMode}>
-          <FaTimes />
+          {collapsed ? <FaChevronRight /> : <FaTimes />}
         </CollapseBtn>
       </TopBar>
 
       <NavSection>
-        <NavItem onClick={() => setSelectedPage("dashboard")} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSelectedPage("dashboard")} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("홈", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaHome />
           <NavText collapsed={collapsed}><strong>홈</strong></NavText>
         </NavItem>
-        <Divider $darkMode={darkMode} />
+        {!collapsed && <Divider $darkMode={darkMode} />}
 
-        <NavItem onClick={() => setSelectedPage("todo")} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSelectedPage("todo")} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("To-do List", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaClipboardList />
           <NavText collapsed={collapsed}><strong>To-do List</strong></NavText>
         </NavItem>
-        <Divider $darkMode={darkMode} />
+        {!collapsed && <Divider $darkMode={darkMode} />}
 
-        <NavItem onClick={() => setCareerOpen(!careerOpen)} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setCareerOpen(!careerOpen)} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("커리어 로드맵", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaBullseye />
           <NavText collapsed={collapsed}><strong>커리어 로드맵</strong></NavText>
           {!collapsed && (
@@ -112,9 +161,15 @@ export default function Sidebar({
             </SubItem>
           ))
         }
-        <Divider $darkMode={darkMode} />
+        {!collapsed && <Divider $darkMode={darkMode} />}
 
-        <NavItem onClick={() => setSearchOpen(!searchOpen)} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSearchOpen(!searchOpen)} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("검색", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaSearch />
           <NavText collapsed={collapsed}><strong>검색</strong></NavText>
           {!collapsed && (
@@ -137,37 +192,75 @@ export default function Sidebar({
           ))
         }
 
-        <NavItem onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSelectedPage("saved")} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("찜한 페이지", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaHeart />
           <NavText collapsed={collapsed}><strong>찜한 페이지</strong></NavText>
         </NavItem>
-        <Divider $darkMode={darkMode} />
+        {!collapsed && <Divider $darkMode={darkMode} />}
 
-        <NavItem onClick={() => setSelectedPage("chat")} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSelectedPage("chat")} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("채팅", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaComments />
           <NavText collapsed={collapsed}><strong>채팅</strong></NavText>
         </NavItem>
 
-        <NavItem onClick={() => setSelectedPage("history")} $darkMode={darkMode}>
+        <NavItem 
+          onClick={() => setSelectedPage("history")} 
+          $darkMode={darkMode} 
+          collapsed={collapsed}
+          onMouseEnter={(e) => showTooltip("대화 이력", e)}
+          onMouseLeave={hideTooltip}
+        >
           <FaHistory />
           <NavText collapsed={collapsed}><strong>대화 이력</strong></NavText>
         </NavItem>
       </NavSection>
+      
+      {/* 커스텀 툴팁 */}
+      {tooltip.show && (
+        <CustomTooltip 
+          style={{ 
+            left: tooltip.x, 
+            top: tooltip.y,
+            transform: 'translateY(-50%)'
+          }}
+          $darkMode={darkMode}
+        >
+          {tooltip.text}
+        </CustomTooltip>
+      )}
     </Wrapper>
   );
 }
 
 const Wrapper = styled.aside`
-  width: ${p => p.collapsed ? "56px" : "260px"};
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: ${p => p.collapsed ? "90px" : "260px"};
   display: flex;
   flex-direction: column;
   padding: 1rem;
   transition: width .25s;
+  z-index: 1000;
+  overflow-y: auto;
   ${({ $darkMode }) => $darkMode ? css`
     background: #333;
     color: #ccc;
   ` : css`
-    background: rgb(206, 205, 204);
+    background: rgb(197, 196, 195);
     color: #51442a;
     box-shadow: 1px 0 4px rgba(0,0,0,.05);
   `}
@@ -181,8 +274,9 @@ const TopBar = styled.div`
 `;
 
 const Logo = styled.div`
-  font-size: 1.2rem;
-  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
   cursor: pointer;
 `;
 
@@ -190,10 +284,23 @@ const LogoText = styled.span`
   margin-left: .5rem;
   display: ${p => p.collapsed ? "none" : "inline"};
   color: #ffc107;
+  font-size: 1.8rem;
+  font-weight: 700;
+`;
+
+const LogoSubtitle = styled.div`
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #666;
+  line-height: 1.2;
+  margin-left: .5rem;
+  display: ${p => p.collapsed ? "none" : "block"};
+  ${({ $darkMode }) => $darkMode && css`color: #aaa;`}
 `;
 
 const NavSection = styled.div`
   flex: 1;
+  margin-top: 1.7rem;
 `;
 
 const NavText = styled.div`
@@ -206,10 +313,12 @@ const NavItem = styled.div`
   display: flex;
   align-items: center;
   gap: .6rem;
-  padding: .6rem;
+  padding: ${p => p.collapsed ? "1.2rem 0.5rem" : "0.6rem"};
   border-radius: .4rem;
   cursor: pointer;
   transition: all .2s;
+  justify-content: ${p => p.collapsed ? "center" : "flex-start"};
+  margin-bottom: ${p => p.collapsed ? "1rem" : "0"};
   ${({ $darkMode }) => $darkMode ? css`
     &:hover {
       background: #3a3a3a;
@@ -286,6 +395,31 @@ const CollapseBtn = styled.div`
   &:hover {
     color: #ff4757;
     background: ${({ $darkMode }) => $darkMode ? "#3a3a3a" : "#f0f0f0"};
+  }
+`;
+
+const CustomTooltip = styled.div`
+  position: fixed;
+  background: ${({ $darkMode }) => $darkMode ? '#333' : '#000'};
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#fff'};
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  z-index: 10000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: tooltipFadeIn 0.1s ease-in-out;
+  
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-50%) translateX(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-50%) translateX(0);
+    }
   }
 `;
 

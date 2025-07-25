@@ -279,9 +279,10 @@ const JobCard = styled.div`
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
-  overflow: hidden; // 가로 스크롤 방지
+  overflow: hidden;
+  
   &:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;

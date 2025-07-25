@@ -130,30 +130,53 @@ export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFiel
           }));
         }
 
-        console.log("워드클라우드 데이터:", words);
-        setTrendData(words);
-        setCacheKey(currentCacheKey);
-        setHasInitialized(true);
-        
-        // 부모 컴포넌트로 데이터 전달
-        if (onDataUpdate) {
-          const processedData = words.map(item => ({
-            skill: item.text,
-            count: item.value,
-            text: item.text,
-            value: item.value
-          }));
-          console.log('🔄 [JobKeywordAnalysis] 부모로 전달할 데이터:', processedData);
-          onDataUpdate(processedData);
+
+         // ▼▼▼ 여기를 새로운 집계 코드로 교체 ▼▼▼
+        // ▼▼▼ 이 부분이 핵심입니다 ▼▼▼
+      // 1. Map을 사용해 중복된 스킬의 빈도수(value)를 합산합니다.
+      const skillCounts = new Map();
+      words.forEach(word => {
+        if (word.text && typeof word.text === 'string' && word.value > 0) {
+          const normalizedText = word.text.trim();
+          const currentCount = skillCounts.get(normalizedText) || 0;
+          skillCounts.set(normalizedText, currentCount + word.value);
         }
-      } catch (err) {
-        console.error("트렌드 데이터 로딩 실패:", err);
-        setError("트렌드 데이터를 불러오는데 실패했습니다.");
-        setTrendData([]);
-      } finally {
-        setLoading(false);
+      });
+
+      // 2. 집계된 Map을 워드클라우드용 배열 데이터로 변환합니다.
+      const aggregatedData = Array.from(skillCounts, ([text, value]) => ({
+        text,
+        value,
+      }));
+      // ▲▲▲ 여기까지 ▲▲▲
+
+      // 워드클라우드용 데이터는 여기서 바로 상태 업데이트
+      setTrendData(aggregatedData);
+
+      // ▼▼▼ 여기가 핵심 수정 부분 ▼▼▼
+      if (onDataUpdate) {
+        // 3. 부모 컴포넌트가 사용할 수 있도록 {skill, count} 형태로 변환
+        let dataForParent = aggregatedData.map(item => ({
+          skill: item.text,
+          count: item.value
+        }));
+
+        // 4. count 기준으로 내림차순 정렬 (최고 인기 기술을 위해)
+        dataForParent.sort((a, b) => b.count - a.count);
+
+        // 5. 최종 가공된 데이터를 부모에게 전달
+        onDataUpdate(dataForParent);
       }
-    };
+      // ▲▲▲ 여기까지 수정 ▲▲▲
+      
+    } catch (err) {
+      console.error("트렌드 데이터 로딩 실패:", err);
+      setError("트렌드 데이터를 불러오는데 실패했습니다.");
+      setTrendData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     // 메인페이지에서는 디바운싱 시간을 늘려서 중복 호출 방지
     const debounceTime = isMainPage ? 500 : 300;
@@ -167,7 +190,7 @@ export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFiel
     fontFamily: "Pretendard, sans-serif",
     enableTooltip: false,
     deterministic: true,
-    removeDuplicateWords: false,
+    removeDuplicateWords: true,
     colors: ["#264653", "#2a9d8f", "#e76f51", "#f4a261", "#e9c46a"],
   }), [isMainPage]);
 

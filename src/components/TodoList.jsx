@@ -177,7 +177,7 @@ export default function TodoList({ darkMode = false }) {
           {isModalOpen && <TodoModal darkMode={darkMode} todo={editingTodo} onClose={closeModal} onSave={handleSave} />}
 
           <HeaderRow>
-              <SectionTitle>My To-do List</SectionTitle>
+              <SectionTitle>To-do List</SectionTitle>
               <StatBox>
                   <span>전체 {stats.total_count}</span>
                   <span style={{color: '#2ecc71'}}>완료 {stats.completed_count}</span>

@@ -40,14 +40,15 @@ export const UserDataProvider = ({ children }) => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      // 1. API 주소를 '/me'로 수정
-      const response = await axios.get(`${BASE_URL}/me`, { headers });
+      console.log('🔍 [UserDataContext] 사용자 데이터 조회 시작:', `${BASE_URL}/users/me`);
+      const response = await axios.get(`${BASE_URL}/users/me`, { headers });
       
+      console.log('✅ [UserDataContext] 사용자 데이터 조회 성공:', response.data);
       setUserData(response.data);
       setLastFetchTime(prev => ({ ...prev, user: Date.now() }));
       setError(null);
     } catch (err) {
-      console.error("사용자 데이터 조회 실패:", err);
+      console.error("❌ [UserDataContext] 사용자 데이터 조회 실패:", err);
       setError(err.message);
       // 401 (Unauthorized) 오류 발생 시 사용자 데이터 초기화
       if (err.response && err.response.status === 401) {
@@ -75,12 +76,16 @@ export const UserDataProvider = ({ children }) => {
 
   // 3. 초기 데이터 로드를 간결하게 수정
   useEffect(() => {
+    console.log('🔄 [UserDataContext] 초기 데이터 로드 시작');
     // desiredJob은 토큰 유무와 상관없이 항상 조회
     fetchDesiredJob();
     // userData는 토큰이 있을 때만 조회
     const token = localStorage.getItem("accessToken");
     if (token) {
-      fetchUserData();
+      console.log('🔍 [UserDataContext] 토큰 발견, 사용자 데이터 조회 시작');
+      fetchUserData(true); // 강제 새로고침
+    } else {
+      console.log('⚠️ [UserDataContext] 토큰 없음, 사용자 데이터 조회 건너뜀');
     }
   }, []); // 이 useEffect는 마운트 시 한 번만 실행됩니다.
 

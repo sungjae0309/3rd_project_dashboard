@@ -7,7 +7,7 @@ const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:80
 // 직무명 리스트 조회
 export const getJobNames = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/job-skills/job-names`);
+    const response = await axios.get(`${BASE_URL}/job-role/job-names`);
     return response.data;
   } catch (error) {
     console.error('직무명 조회 실패:', error);

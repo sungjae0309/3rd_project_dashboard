@@ -42,7 +42,7 @@ export default function RegisterNext() {
       const headers = token ? { Authorization:`Bearer ${token}` } : {};
       try {
         const [jobs, certs, skills] = await Promise.all([
-          axios.get(`${BASE_URL}/job-skills/job-names`, { headers }),
+          axios.get(`${BASE_URL}/job-role/job-names`, { headers }),
           axios.get(`${BASE_URL}/certificates/`,        { headers }),
           axios.get(`${BASE_URL}/skills/`,              { headers }),
         ]);

@@ -155,6 +155,8 @@ export default function App() {
               selectedPage={selectedPage}
               setSelectedPage={setSelectedPage}
               darkMode={darkMode}
+              toggleTheme={() => {}} // 빈 함수로 전달
+              sidebarCollapsed={sidebarCollapsed}
             />
           </div>
         } />

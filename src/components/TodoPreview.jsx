@@ -102,7 +102,7 @@ function TodoPreview({ darkMode, setSelectedPage }) {
 
     return (
         <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("todo")}>
-            <CardIconBg><FaClipboardCheck /></CardIconBg>
+            
             <SectionTitle>
                 <HighlightBar />
                 <span>To-do List</span>
@@ -110,7 +110,7 @@ function TodoPreview({ darkMode, setSelectedPage }) {
 
             {hasSchedule ? (
                 <>
-                    <IntroText $darkMode={darkMode}>오늘의 학습 계획을 확인하고 관리하세요.</IntroText>
+                    <IntroText $darkMode={darkMode}>학습 계획을 확인하고 관리하세요</IntroText>
                     <StatsRow>
                         <StatBox><StatValue color="#3498db">{stats.total}</StatValue><StatLabel>오늘 할 일</StatLabel></StatBox>
                         <StatBox><StatValue color="#2ecc71">{stats.completed}</StatValue><StatLabel>완료</StatLabel></StatBox>
@@ -161,22 +161,22 @@ export default React.memo(TodoPreview);
 
 const HoverCard = styled.div`
   position: relative;
-  background: #edece9;
+  background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f0f0f0'};
   border-radius: 2rem;
   padding: 1.5rem 1.8rem 1rem;
   cursor: pointer;
-  transition: all 0.3s;
-  ${({ $darkMode }) => $darkMode && css`background: #2b2b2b; color: #fff;`}
+  transition: background 0.2s ease;
+  ${({ $darkMode }) => $darkMode && css`color: #fff;`}
   
   /* ▼▼▼ 핵심 수정사항 ▼▼▼ */
-  height: 470px; /* 높이를 고정합니다. (AI 추천 공고 카드 높이에 맞춰 조절) */
+  height: 490px; /* 높이를 고정합니다. (AI 추천 공고 카드 높이에 맞춰 조절) */
   display: flex;
   flex-direction: column;
   /* ▲▲▲ 수정 완료 ▲▲▲ */
   
+  /* 호버 시 배경색 수정 - 커리어 로드맵과 동일한 호버 배경색 */
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    background: ${({ $darkMode }) => $darkMode ? '#3a3a3a' : '#f8f9fa'};
   }
 `;
 
@@ -242,10 +242,12 @@ const StatLabel = styled.div`
 `;
 
 const TaskList = styled.div`
-    flex: 1;
+    flex: 1; /* ★★★ 핵심: 남은 공간을 모두 차지하도록 설정 */
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
+    overflow-y: auto; /* 할 일이 3개를 넘어가면 스크롤 처리 */
+    min-height: 0; /* flex 자식 요소의 크기 오류 방지 */
 `;
 
 const TaskItem = styled.div`
@@ -260,9 +262,7 @@ const TaskItem = styled.div`
     text-decoration: ${({ $isCompleted }) => $isCompleted ? 'line-through' : 'none'};
     color: ${({ $isCompleted }) => $isCompleted ? '#888' : 'inherit'};
 
-    &:hover {
-        transform: translateX(4px);
-    }
+    
 `;
 
 const Checkbox = styled.div`
@@ -286,7 +286,7 @@ const EmptyMessage = styled.p`
 `;
 
 const ViewAllButton = styled.button`
-    margin-top: auto;
+    margin-top: auto; /* 버튼을 항상 하단에 고정 */
     width: 100%;
     padding: 0.8rem;
     background: #ffc107;
@@ -295,6 +295,7 @@ const ViewAllButton = styled.button`
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    flex-shrink: 0; /* 버튼 크기가 줄어들지 않도록 설정 */
 
     &:hover {
         background: #ffb300;

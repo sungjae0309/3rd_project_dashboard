@@ -1,4 +1,3 @@
-/* ───────── src/components/MainContent.jsx ───────── */
 import React, { useState, useRef, useEffect } from "react";
 import ChatSessionsList from "./ChatSessionsList";
 import styled, { keyframes, css } from "styled-components";
@@ -14,7 +13,10 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaGraduationCap,
-  FaBook
+  FaBook,
+  FaBriefcase,
+  FaLaptopCode,
+  FaChalkboardTeacher
 } from "react-icons/fa";
 import { FiSearch, FiBookmark } from "react-icons/fi";
 import TodoList from "./TodoList";
@@ -54,6 +56,7 @@ export default function MainContent({
   setSelectedPage,
   darkMode,
   toggleTheme,
+  sidebarCollapsed = false,
 }) {
   const [selectedSession, setSelectedSession] = useState(null);
   const [savedJobs, setSavedJobs] = useState([]);
@@ -66,7 +69,7 @@ export default function MainContent({
   const [selectedReasonJob, setSelectedReasonJob] = useState(null);
 
   // Context에서 데이터 가져오기
-  const { desiredJob, fetchDesiredJob } = useUserData();
+  const { userData, desiredJob, fetchDesiredJob, loading } = useUserData();
   const { roadmapData, fetchRoadmapData } = useRoadmap();
 
   // Gemini가 추가한 상태들
@@ -419,39 +422,14 @@ useEffect(() => {
                     )}
                     {s.id === "gap" && (
                       <>
-                        <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
+                        <GapCardHeader>
+                          <GapCardTitle>{s.label}</GapCardTitle>
+                          <GapCardSubtitle>내 이력서와 공고를 비교합니다</GapCardSubtitle>
+                        </GapCardHeader>
                         <GapAnalysisSection 
                           selectedJob={selectedJob} 
                           darkMode={darkMode}
                         />
-                      </>
-                    )}
-                    {s.id === "plan" && (
-                      <>
-                        <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
-                        <p style={{ marginBottom: '1rem', textAlign: 'center', width: '100%' }}>{s.desc}</p>
-                        <RoadmapPreview>
-                          {roadmapData.bootcamps.length > 0 && (
-                            <RoadmapItem>
-                              <RoadmapTitle>부트캠프</RoadmapTitle>
-                              <RoadmapName>{roadmapData.bootcamps[0].name}</RoadmapName>
-                              <RoadmapDuration>{roadmapData.bootcamps[0].duration}</RoadmapDuration>
-                            </RoadmapItem>
-                          )}
-                          {roadmapData.courses.length > 0 && (
-                            <RoadmapItem>
-                              <RoadmapTitle>강의</RoadmapTitle>
-                              <RoadmapName>{roadmapData.courses[0].name}</RoadmapName>
-                              <RoadmapDuration>{roadmapData.courses[0].duration}</RoadmapDuration>
-                            </RoadmapItem>
-                          )}
-                        </RoadmapPreview>
-                        <ViewAllButton onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewAllClick("plan");
-                        }}>
-                          전체 보기 →
-                        </ViewAllButton>
                       </>
                     )}
                   </MiniCard>
@@ -463,30 +441,58 @@ useEffect(() => {
                     onClick={() => handleViewAllClick("plan")}
                     style={{ minHeight: "370px", maxHeight: "370px", display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', padding: '1.3rem', overflow: 'hidden' }}
                   >
-                    <h3 style={{ marginBottom: '0.8rem', textAlign: 'center', width: '100%' }}>{s.label}</h3>
-                    <p style={{ marginBottom: '1rem', textAlign: 'center', width: '100%' }}>{s.desc}</p>
-                    <RoadmapPreview>
+                    <PlanCardHeader>
+                      <PlanCardTitle>{s.label}</PlanCardTitle>
+                      <PlanCardSubtitle>{s.desc}</PlanCardSubtitle>
+                    </PlanCardHeader>
+                    <PlanContent>
                       {roadmapData.bootcamps.length > 0 && (
-                        <RoadmapItem>
-                          <RoadmapTitle>부트캠프</RoadmapTitle>
-                          <RoadmapName>{roadmapData.bootcamps[0].name}</RoadmapName>
-                          <RoadmapDuration>{roadmapData.bootcamps[0].duration}</RoadmapDuration>
-                        </RoadmapItem>
+                        <PlanItem>
+                          <PlanItemIcon>🎓</PlanItemIcon>
+                          <PlanItemContent>
+                            <PlanItemTitle>부트캠프</PlanItemTitle>
+                            <PlanItemName>{roadmapData.bootcamps[0].name}</PlanItemName>
+                            <PlanItemDuration>{roadmapData.bootcamps[0].duration}</PlanItemDuration>
+                          </PlanItemContent>
+                        </PlanItem>
+                      )}
+                      {roadmapData.bootcamps.length > 1 && (
+                        <PlanItem>
+                          <PlanItemIcon>🎓</PlanItemIcon>
+                          <PlanItemContent>
+                            <PlanItemTitle>부트캠프</PlanItemTitle>
+                            <PlanItemName>{roadmapData.bootcamps[1].name}</PlanItemName>
+                            <PlanItemDuration>{roadmapData.bootcamps[1].duration}</PlanItemDuration>
+                          </PlanItemContent>
+                        </PlanItem>
                       )}
                       {roadmapData.courses.length > 0 && (
-                        <RoadmapItem>
-                          <RoadmapTitle>강의</RoadmapTitle>
-                          <RoadmapName>{roadmapData.courses[0].name}</RoadmapName>
-                          <RoadmapDuration>{roadmapData.courses[0].duration}</RoadmapDuration>
-                        </RoadmapItem>
+                        <PlanItem>
+                          <PlanItemIcon>📚</PlanItemIcon>
+                          <PlanItemContent>
+                            <PlanItemTitle>강의</PlanItemTitle>
+                            <PlanItemName>{roadmapData.courses[0].name}</PlanItemName>
+                            <PlanItemDuration>{roadmapData.courses[0].duration}</PlanItemDuration>
+                          </PlanItemContent>
+                        </PlanItem>
                       )}
-                    </RoadmapPreview>
-                    <ViewAllButton onClick={(e) => {
+                      {roadmapData.courses.length > 1 && (
+                        <PlanItem>
+                          <PlanItemIcon>📚</PlanItemIcon>
+                          <PlanItemContent>
+                            <PlanItemTitle>강의</PlanItemTitle>
+                            <PlanItemName>{roadmapData.courses[1].name}</PlanItemName>
+                            <PlanItemDuration>{roadmapData.courses[1].duration}</PlanItemDuration>
+                          </PlanItemContent>
+                        </PlanItem>
+                      )}
+                    </PlanContent>
+                    <PlanViewAllButton onClick={(e) => {
                       e.stopPropagation();
                       handleViewAllClick("plan");
                     }}>
                       전체 보기 →
-                    </ViewAllButton>
+                    </PlanViewAllButton>
                   </MiniCard>
                 )
             ))}
@@ -497,17 +503,31 @@ useEffect(() => {
         {/* 기존 공고 검색과 찜한 공고 탭 수정 */}
         <SingleCard>
           <MiniMapGrid>
-            <MiniMapItem onClick={() => setSelectedPage("search")} $darkMode={darkMode}>
-              <MiniMapIcon $darkMode={darkMode}>
-                <FaSearch />
-              </MiniMapIcon>
-              <MiniMapLabel $darkMode={darkMode}>공고 검색</MiniMapLabel>
+            <MiniMapItem $darkMode={darkMode}>
+              <MiniMapTitle>
+                <MiniMapHighlightBar />
+                <span>검색</span>
+              </MiniMapTitle>
+              <SearchModules>
+                <SearchModule onClick={() => setSelectedPage("search")}>
+                  <SearchModuleIcon><FaBriefcase /></SearchModuleIcon>
+                  <SearchModuleLabel>공고</SearchModuleLabel>
+                </SearchModule>
+                <SearchModule onClick={() => setSelectedPage("roadmap-bootcamps")}>
+                  <SearchModuleIcon><FaLaptopCode /></SearchModuleIcon>
+                  <SearchModuleLabel>부트캠프</SearchModuleLabel>
+                </SearchModule>
+                <SearchModule onClick={() => setSelectedPage("roadmap-courses")}>
+                  <SearchModuleIcon><FaChalkboardTeacher /></SearchModuleIcon>
+                  <SearchModuleLabel>강의</SearchModuleLabel>
+                </SearchModule>
+              </SearchModules>
             </MiniMapItem>
             <MiniMapItem onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
-              <MiniMapIcon $darkMode={darkMode}>
-                <FaHeart />
-              </MiniMapIcon>
-              <MiniMapLabel $darkMode={darkMode}>찜한 공고</MiniMapLabel>
+              <MiniMapTitle>
+                <MiniMapHighlightBar />
+                <span>찜한 페이지</span>
+              </MiniMapTitle>
             </MiniMapItem>
           </MiniMapGrid>
         </SingleCard>
@@ -680,10 +700,15 @@ useEffect(() => {
   // 추천 이유 모달 닫기
   const handleCloseReasonModal = () => setSelectedReasonJob(null);
 
+  // 디버깅을 위한 로그 추가
+  console.log('🔍 [MainContent] 사용자 데이터 상태:', { loading, userData, name: userData?.name });
+
   return (
-    <Main $darkMode={darkMode}>
+    <Main $darkMode={darkMode} $sidebarCollapsed={sidebarCollapsed}>
       <HeaderWrapper>
-        <Header $darkMode={darkMode}>김취준님, 만나서 반갑습니다</Header>
+        <Header $darkMode={darkMode}>
+          {loading ? '사용자 정보 로딩 중...' : '만나서 반갑습니다'}
+        </Header>
         <ProfileMenuWrapper>
             <ProfileMenu darkMode={darkMode} toggleTheme={toggleTheme} setSelectedPage={setSelectedPage} />
         </ProfileMenuWrapper>
@@ -773,10 +798,7 @@ useEffect(() => {
           {/* ======================================================================= */}
           
           {selectedPage === "todo" ? (
-            <Card $darkMode={darkMode} style={{ padding: "2.5rem" }}>
-              <SectionTitle style={{ fontSize: "1.9rem", marginBottom: "1.4rem" }}><HighlightBar /><span></span></SectionTitle>
-              <TodoList darkMode={darkMode} onPage="todo" />
-            </Card>
+            <TodoList darkMode={darkMode} onPage="todo" />
           ) : (
             selectedPage !== "ai-jobs" &&
             !selectedPage.startsWith("career-") && 
@@ -841,8 +863,10 @@ const fadeIn = keyframes`from { opacity: 0; transform: translateY(20px); } to { 
 
 const Main = styled.main`
     flex: 1; display: flex; flex-direction: column; position: relative;
+    margin-left: ${({ $sidebarCollapsed }) => $sidebarCollapsed ? "90px" : "260px"};
     ${({ $darkMode }) => $darkMode ? css`background: #000; color: #fff;` : css`background: #fff; color: #614f25;`}
-    min-height: 100vh; padding-bottom: 200px;
+    min-height: 100vh; padding-bottom: 120px;
+    transition: margin-left 0.25s ease;
 `;
 
 const HeaderWrapper = styled.div`
@@ -852,14 +876,13 @@ const HeaderWrapper = styled.div`
 `;
 
 const HoverCard = styled.div`
-  position: relative;
-  background: #edece9;
-  border-radius: 2rem;
+  background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f0f0f0'}; // 라이트모드 기본색을 호버색으로 변경
+  border-radius: 1.5rem;
   padding: 2rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid ${({ $darkMode }) => $darkMode ? '#404040' : '#e9ecef'};
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  ${({ $darkMode }) => $darkMode && css`background: #2b2b2b; color: #fff;`}
-  min-width: 340px;
+  transition: background 0.2s ease;
   max-width: 100%;
   min-height: 520px;
   max-height: 520px;
@@ -869,17 +892,9 @@ const HoverCard = styled.div`
   align-items: flex-start;
   box-sizing: border-box;
   
-  /* 간결한 호버 애니메이션 */
+  /* 호버 시 배경색 수정 - 라이트모드에서 기본색으로 */
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-    background: ${({ $darkMode }) => $darkMode ? '#333' : '#f5f5f3'};
-  }
-  
-  /* 클릭 시 애니메이션 */
-  &:active {
-    transform: translateY(-2px);
-    transition: all 0.1s ease;
+    background: ${({ $darkMode }) => $darkMode ? '#3a3a3a' : '#f8f9fa'}; // 라이트모드 호버색을 기본색으로 변경
   }
 `;
 
@@ -895,11 +910,7 @@ const CardIconBg = styled.div`
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   ${({ $darkMode }) => $darkMode && css`color: #444;`}
   
-  /* 간결한 호버 시 아이콘 애니메이션 */
-  ${HoverCard}:hover & {
-    opacity: 0.6;
-    color: ${({ $darkMode }) => $darkMode ? '#555' : 'rgb(200, 200, 200)'};
-  }
+  /* 호버 시 아이콘 애니메이션 제거 */
 `;
 
 const SectionTitle = styled.div`
@@ -912,10 +923,7 @@ const SectionTitle = styled.div`
   justify-content: space-between;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* 간결한 호버 시 제목 애니메이션 */
-  ${HoverCard}:hover & {
-    transform: translateX(2px);
-  }
+  /* 호버 시 제목 애니메이션 제거 */
 `;
 
 const IntroText = styled.p`
@@ -927,10 +935,7 @@ const IntroText = styled.p`
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   ${({ $darkMode }) => $darkMode && css`color: #ccc;`}
   
-  /* 간결한 호버 시 텍스트 애니메이션 */
-  ${HoverCard}:hover & {
-    color: ${({ $darkMode }) => $darkMode ? '#ddd' : '#5a4f3f'};
-  }
+  /* 호버 시 텍스트 애니메이션 제거 */
 `;
 
 const HighlightBar = styled.div`
@@ -940,12 +945,7 @@ const HighlightBar = styled.div`
   border-radius: 4px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* ✨ [추가] 호버 시 하이라이트 바 애니메이션 */
-  ${HoverCard}:hover & {
-    width: 12px;
-    background: linear-gradient(135deg, #ffc400, #ff8c00);
-    box-shadow: 0 2px 8px rgba(255, 196, 0, 0.3);
-  }
+  /* 호버 시 하이라이트 바 애니메이션 제거 */
 `;
 
 const Header = styled.h1`
@@ -997,7 +997,7 @@ const MiniCard = styled.div`
   padding: 1.5rem;
   position: relative;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: background 0.2s ease; // transform 대신 background만 변경
   min-height: 400px;
   display: flex;
   flex-direction: column;
@@ -1005,7 +1005,14 @@ const MiniCard = styled.div`
   ${({ $darkMode }) => $darkMode && css`background: #333; color: #fff;`}
   
   &:hover {
-    transform: translateY(-2px);
+    background: ${({ $bg, $darkMode }) => {
+      if ($darkMode) return '#444'; // 다크모드일 때 더 밝은 회색
+      // 라이트모드일 때는 기존 배경색보다 약간 더 밝게
+      if ($bg === 'rgb(250, 243, 221)') return 'rgb(252, 248, 235)'; // 트렌드 분석
+      if ($bg === 'rgb(251, 233, 179)') return 'rgb(253, 240, 195)'; // 갭 분석
+      if ($bg === 'rgb(252, 224, 132)') return 'rgb(254, 232, 155)'; // 극복 방안
+      return $bg; // 기본값
+    }};
   }
   
   h3 {
@@ -1356,37 +1363,99 @@ const MiniMapGrid = styled.div`
   width: 100%;
 `;
 
+const MiniMapTitle = styled.div`
+  position: absolute;
+  top: 1.4rem;
+  left: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #333;
+  z-index: 1;
+  
+  ${({ $darkMode }) => $darkMode && css`
+    color: #fff;
+  `}
+`;
+
+const MiniMapHighlightBar = styled.div`
+  width: 8px;
+  height: 1.6rem;
+  background: #ffc400;
+  border-radius: 4px;
+`;
+
+const SearchModules = styled.div`
+  display: flex;
+  flex-direction: row;
+  gap: 0.6rem;
+  margin-top: 3rem;
+  width: 100%;
+  justify-content: space-between;
+`;
+
+const SearchModule = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.8rem 0.5rem;
+  background: ${({ $darkMode }) => $darkMode ? '#333' : '#fff'};
+  border-radius: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border: 1px solid ${({ $darkMode }) => $darkMode ? '#444' : '#e0e0e0'};
+  flex: 1;
+  
+  &:hover {
+    background: ${({ $darkMode }) => $darkMode ? '#444' : '#f8f9fa'};
+  }
+`;
+
+const SearchModuleIcon = styled.div`
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ${({ $darkMode }) => $darkMode && css`
+    color: #fff;
+  `}
+`;
+
+const SearchModuleLabel = styled.div`
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+`;
+
 const MiniMapItem = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #edece9;
+  background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f0f0f0'};
   border-radius: 1.5rem;
   padding: 2rem 1.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid transparent;
+  transition: background 0.2s ease;
+  border: 1px solid ${({ $darkMode }) => $darkMode ? '#404040' : '#e9ecef'};
   min-height: 180px;
+  position: relative;
   
+  /* 호버 시 배경색 수정 - 커리어 로드맵과 동일한 호버 배경색 */
   &:hover, &:focus {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    background: #f5f5f3;
-    border: 2px solid #ffc107;
-    transform: translateY(-4px);
+    background: ${({ $darkMode }) => $darkMode ? '#3a3a3a' : '#f8f9fa'};
   }
   
   ${({ $darkMode }) => $darkMode && css`
-    background: #2b2b2b;
     color: #fff;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    
-    &:hover, &:focus {
-      background: #333;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    }
   `}
 `;
 
@@ -1662,3 +1731,170 @@ const getDummyCourses = (job) => {
     { title: `${job} 온라인 강의 B`, company: '강의 플랫폼 B' }
   ];
 };
+
+// 새로운 스타일 컴포넌트들 추가 (파일 하단의 스타일 컴포넌트 섹션에 추가)
+const GapCardHeader = styled.div`
+  text-align: center;
+  margin-bottom: 1rem;
+  width: 100%;
+`;
+
+const GapCardTitle = styled.h3`
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  margin: 0 0 0.3rem 0;
+  text-align: center;
+`;
+
+const GapCardSubtitle = styled.p`
+  font-size: 0.8rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  margin: 0;
+  opacity: 0.8;
+  text-align: center;
+`;
+
+const PlanCardHeader = styled.div`
+  text-align: center;
+  margin-bottom: 1.2rem;
+`;
+
+const PlanCardTitle = styled.h3`
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  margin: 0 0 0.3rem 0;
+`;
+
+const PlanCardSubtitle = styled.p`
+  font-size: 0.8rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  margin: 0;
+  opacity: 0.8;
+`;
+
+const PlanContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+  flex: 1;
+  overflow: hidden; // 추가: 넘치는 내용 숨김
+`;
+
+const PlanItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem; // 간격 줄임
+  padding: 0.6rem; // 패딩 줄임
+  background: ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 255, 255, 0.08)' 
+    : 'rgba(255, 255, 255, 0.85)'};
+  border-radius: 0.5rem; // 반지름 줄임
+  border: 1px solid ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 255, 255, 0.15)' 
+    : 'rgba(0, 0, 0, 0.08)'};
+  transition: all 0.2s ease;
+  box-shadow: ${({ $darkMode }) => $darkMode 
+    ? '0 1px 4px rgba(0, 0, 0, 0.2)' 
+    : '0 1px 4px rgba(0, 0, 0, 0.05)'};
+  min-height: 0; // 추가: 최소 높이 제거
+  
+  &:hover {
+    background: ${({ $darkMode }) => $darkMode 
+      ? 'rgba(255, 255, 255, 0.12)' 
+      : 'rgba(255, 255, 255, 0.95)'};
+    transform: translateY(-1px); // 이동 거리 줄임
+    box-shadow: ${({ $darkMode }) => $darkMode 
+      ? '0 2px 6px rgba(0, 0, 0, 0.3)' 
+      : '0 2px 6px rgba(0, 0, 0, 0.1)'};
+  }
+`;
+
+const PlanItemIcon = styled.div`
+  font-size: 1rem; // 크기 줄임
+  flex-shrink: 0;
+  width: 1.6rem; // 크기 줄임
+  height: 1.6rem; // 크기 줄임
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 193, 7, 0.2)' 
+    : 'rgba(255, 193, 7, 0.15)'};
+  border-radius: 0.3rem; // 반지름 줄임
+  border: 1px solid ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 193, 7, 0.3)' 
+    : 'rgba(255, 193, 7, 0.25)'};
+`;
+
+const PlanItemContent = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow: hidden; // 추가: 텍스트 넘침 방지
+`;
+
+const PlanItemTitle = styled.div`
+  font-size: 0.65rem; // 크기 줄임
+  color: ${({ $darkMode }) => $darkMode ? '#aaa' : '#666'};
+  margin-bottom: 0.15rem; // 마진 줄임
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px; // 자간 줄임
+`;
+
+const PlanItemName = styled.div`
+                        <PlanItem>
+                          <PlanItemIcon>🎓</PlanItemIcon>
+                          <PlanItemContent>
+                            <PlanItemTitle>부트캠프</PlanItemTitle>
+                            <PlanItemName>{roadmapData.bootcamps[1].name}</PlanItemName>
+                            <PlanItemDuration>{roadmapData.bootcamps[1].duration}</PlanItemDuration>
+  font-size: 0.75rem; // 크기 조정
+  font-weight: 600;
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  margin-bottom: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal; // nowrap에서 normal로 변경
+  line-height: 1.2;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; // 최대 2줄
+  -webkit-box-orient: vertical;
+  word-break: break-word; // 긴 단어 줄바꿈
+`;
+
+const PlanItemDuration = styled.div`
+  font-size: 0.65rem; // 크기 줄임
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  font-weight: 500;
+`;
+
+const PlanViewAllButton = styled.button`
+  width: 100%;
+  padding: 0.5rem 0.8rem; // 패딩 줄임
+  background: ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 193, 7, 0.2)' 
+    : 'rgba(255, 193, 7, 0.15)'};
+  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  border: 1px solid ${({ $darkMode }) => $darkMode 
+    ? 'rgba(255, 193, 7, 0.3)' 
+    : 'rgba(255, 193, 7, 0.25)'};
+  border-radius: 0.4rem; // 반지름 줄임
+  font-size: 0.75rem; // 크기 줄임
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${({ $darkMode }) => $darkMode 
+      ? 'rgba(255, 193, 7, 0.3)' 
+      : 'rgba(255, 193, 7, 0.25)'};
+    transform: translateY(-1px);
+    box-shadow: ${({ $darkMode }) => $darkMode 
+      ? '0 2px 6px rgba(255, 193, 7, 0.2)' 
+      : '0 2px 6px rgba(255, 193, 7, 0.15)'};
+  }
+`;

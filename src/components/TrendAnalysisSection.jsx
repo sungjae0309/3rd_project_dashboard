@@ -81,7 +81,7 @@ export default function TrendAnalysisSection({ darkMode = false }) {
         setLoading(true);
         
         // 1. 직무명 목록 가져오기
-        const response = await axios.get(`${BASE_URL}/job-skills/job-names`);
+        const response = await axios.get(`${BASE_URL}/job-role/job-names`);
         const jobList = response.data;
         setJobNames(jobList);
         

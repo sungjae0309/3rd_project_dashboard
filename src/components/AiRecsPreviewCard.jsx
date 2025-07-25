@@ -69,6 +69,7 @@ const CompanyNameContainer = styled.div`
   align-items: center;
   gap: 0.4rem;
   color: ${({ $darkMode }) => ($darkMode ? '#bbb' : '#555')};
+  padding-left: 1.8rem;
 `;
 function CompanyNameDisplay({ company, darkMode, maxVisible = 2 }) {
     if (!company) return <div style={{ flex: 3 }}>-</div>;
@@ -335,10 +336,10 @@ console.log(' [AiRecsPreviewCard] 상태 확인:', {
             </HeaderSection>
             <ContentWrapper>
                 <ColumnHeader>
-                    <ColumnTitle style={{ flex: 4, textAlign: "left" }}>공고명</ColumnTitle>
-                    <ColumnTitle style={{ flex: 3, textAlign: "left" }}>회사명</ColumnTitle>
-                    <ColumnTitle style={{ flex: 2, textAlign: "center" }}>적합도</ColumnTitle>
-                    <ColumnTitle style={{ flex: 2, textAlign: "center" }}>추천 이유</ColumnTitle>
+                    <ColumnTitle style={{ flex: 4, textAlign: "left", paddingLeft: "0.5rem" }}>공고명</ColumnTitle>
+                    <ColumnTitle style={{ flex: 3, textAlign: "left", paddingLeft: "3.0rem" }}>회사명</ColumnTitle>
+                    <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "2.5rem" }}>적합도</ColumnTitle>
+                    <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "0.9rem" }}>추천 이유</ColumnTitle>
                 </ColumnHeader>
                 <PreviewList>
                     {(() => {
@@ -412,12 +413,19 @@ console.log(' [AiRecsPreviewCard] 상태 확인:', {
 // --- 스타일 정의 ---
 const HoverCard = styled.div`
   position: relative;
-  background: #edece9;
+  background: ${({ $darkMode }) => $darkMode ? '#2a2a2a' : '#f0f0f0'};
   border: 1px solid ${({ $darkMode }) => ($darkMode ? '#444' : '#e0e0e0')};
   border-radius: 2rem;
   padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  
+  /* 호버 시 배경색 수정 - 커리어 로드맵과 동일한 호버 배경색 */
+  &:hover {
+    background: ${({ $darkMode }) => $darkMode ? '#3a3a3a' : '#f8f9fa'};
+  }
 `;
 
 const HeaderSection = styled.div`
@@ -567,6 +575,7 @@ const MatchPercent = styled.div`
     if ($match >= 40) return '#fd7e14';
     return '#dc3545';
   }};
+  padding-right: 1.6rem;
 `;
 
 const ReasonButtonWrapper = styled.div`

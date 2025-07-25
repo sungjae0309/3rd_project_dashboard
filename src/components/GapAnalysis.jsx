@@ -17,6 +17,40 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
   // AuthContext에서 로그인 상태 가져오기
   const { isLoggedIn } = useAuth();
 
+  // 갭 분석 결과를 파싱하고 포맷팅하는 함수
+  const formatGapResult = (result) => {
+    if (!result) return "";
+    
+    console.log('🔍 [formatGapResult] 입력값:', result);
+    console.log('🔍 [formatGapResult] 입력값 길이:', result.length);
+    
+    let formatted = result;
+    
+    // 방법 1: eval을 사용한 처리 (가장 확실한 방법)
+    try {
+      // eval을 사용하여 문자열 리터럴로 처리
+      formatted = eval(`"${result}"`);
+      console.log('🔍 [formatGapResult] eval 성공:', formatted);
+    } catch (e) {
+      console.log('🔍 [formatGapResult] eval 실패:', e);
+      
+      // 방법 2: 직접 replace (모든 경우 처리)
+      formatted = result
+        .replace(/\\n/g, '\n')
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\r/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+      
+      console.log('🔍 [formatGapResult] 직접 replace 사용:', formatted);
+    }
+    
+    console.log('🔍 [formatGapResult] 최종 결과:', formatted);
+    console.log('🔍 [formatGapResult] 최종 결과 길이:', formatted.length);
+    
+    return formatted.trim();
+  };
+
   useEffect(() => {
     // 로그인하지 않았으면 API 호출하지 않음
     if (!isLoggedIn) {
@@ -74,7 +108,15 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
           { params: { category: jobCategory }, headers }
         );
 
-        setGapResult(gapData.gap_result || "분석 결과가 없습니다.");
+        // 디버깅: 원본 데이터 확인
+        console.log('🔍 [GapAnalysis] 원본 gap_result:', gapData.gap_result);
+        console.log('🔍 [GapAnalysis] 원본 데이터 타입:', typeof gapData.gap_result);
+
+        // 결과를 포맷팅하여 설정
+        const formattedResult = formatGapResult(gapData.gap_result);
+        console.log('🔍 [GapAnalysis] 포맷팅된 결과:', formattedResult);
+        
+        setGapResult(formattedResult || "분석 결과가 없습니다.");
         setTopSkills(gapData.top_skills || []);
       } catch (err) {
         console.error('갭 분석 오류:', err);
@@ -110,7 +152,7 @@ export default function GapAnalysis({ darkMode = false, setSelectedPage }) {
           <LoadingText>분석 중...</LoadingText>
         ) : (
           <>
-            <ResultText>
+            <ResultText $darkMode={darkMode}>
               {gapResult || "분석 결과가 없습니다."}
             </ResultText>
             {topSkills.length > 0 && (
@@ -187,11 +229,21 @@ const Text = styled.p`
   line-height: 1.6;
 `;
 
-const ResultText = styled.pre`
+const ResultText = styled.div`
   font-size: 1.05rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
+  line-height: 1.8;
+  white-space: pre-wrap !important;
+  word-wrap: break-word;
+  word-break: break-word;
   margin-bottom: 1.2rem;
+  padding: 1rem;
+  background: ${({ $darkMode }) => $darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'};
+  border-radius: 0.5rem;
+  border: 1px solid ${({ $darkMode }) => $darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'};
+  color: ${({ $darkMode }) => $darkMode ? '#eee' : '#333'};
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  overflow-wrap: break-word;
+  hyphens: auto;
 `;
 
 const SkillList = styled.div`

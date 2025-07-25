@@ -35,7 +35,7 @@ export const JobNamesProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await axios.get(`${BASE_URL}/job-skills/job-names`, {
+      const response = await axios.get(`${BASE_URL}/job-role/job-names`, {
         params: { force_refresh: forceRefresh }
       });
       

@@ -45,7 +45,7 @@ export default function TrendDetail({ darkMode = false, setSelectedPage }) {
     const fetchJobNames = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${BASE_URL}/job-skills/job-names`);
+        const response = await axios.get(`${BASE_URL}/job-role/job-names`);
         setJobNames(response.data);
         if (response.data.length > 0) {
           setSelectedJob(response.data[0]);
