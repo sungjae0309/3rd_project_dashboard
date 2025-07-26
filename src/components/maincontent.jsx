@@ -528,6 +528,12 @@ useEffect(() => {
                 <MiniMapHighlightBar />
                 <span>찜한 페이지</span>
               </MiniMapTitle>
+              <SearchModules>
+                <SearchModule>
+                  <SearchModuleIcon><FiBookmark /></SearchModuleIcon>
+                  <SearchModuleLabel>저장된 항목</SearchModuleLabel>
+                </SearchModule>
+              </SearchModules>
             </MiniMapItem>
           </MiniMapGrid>
         </SingleCard>

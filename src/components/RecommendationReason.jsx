@@ -52,7 +52,10 @@ export default function RecommendationReason({ darkMode, job, onClose }) {
             <SubTitle>AI 추천 이유</SubTitle>
             <ContentArea>
                 {isLoading ? (
-                    <LoadingText>⏳ 추천 이유를 분석 중입니다...</LoadingText>
+                    <LoadingContainer>
+                        <LoadingSpinner />
+                        <LoadingText $darkMode={darkMode}>추천 이유를 분석 중입니다...</LoadingText>
+                    </LoadingContainer>
                 ) : error ? (
                     <ErrorMessage>{error}</ErrorMessage>
                 ) : (
@@ -126,10 +129,35 @@ const ContentArea = styled.div`
     border-radius: 4px;
   }
 `;
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 0;
+  gap: 1rem;
+`;
+
+const LoadingSpinner = styled.div`
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #ffc107;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 const LoadingText = styled.p`
   text-align: center;
-  padding: 2.5rem 0;
   font-size: 1.1rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  margin: 0;
 `;
 const ErrorMessage = styled.div`
   color: #f44336;
