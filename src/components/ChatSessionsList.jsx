@@ -6,7 +6,7 @@ import {
   deleteChatSession,
   fetchChatHistory,
 } from "../api/mcp";
-import { FaRegClock, FaTrashAlt, FaCommentDots, FaCheck, FaTimes } from "react-icons/fa";
+import { FaRegClock, FaTrashAlt, FaCommentDots, FaCheck } from "react-icons/fa";
 
 // 시간 차이를 계산하여 "방금 전", "어제" 등으로 변환하는 함수
 const timeSince = (date) => {
@@ -30,7 +30,6 @@ const SessionCard = React.memo(({
   onSelect, 
   onDelete, 
   darkMode, 
-  isSelectionMode, 
   isSelected, 
   onToggleSelect 
 }) => {
@@ -38,12 +37,15 @@ const SessionCard = React.memo(({
   const sessionDate = session.updated_at ? new Date(session.updated_at) : new Date();
 
   const handleCardClick = (e) => {
-    if (isSelectionMode) {
-      e.preventDefault();
-      onToggleSelect(session.id); // 그냥 session.id 그대로 사용
-    } else {
-      onSelect(session.id); // 그냥 session.id 그대로 사용
+    // 체크박스를 클릭한 경우가 아니라면 세션 선택
+    if (!e.target.closest('.checkbox-area')) {
+      onSelect(session.id);
     }
+  };
+
+  const handleCheckboxClick = (e) => {
+    e.stopPropagation();
+    onToggleSelect(session.id);
   };
 
   return (
@@ -51,13 +53,14 @@ const SessionCard = React.memo(({
       onClick={handleCardClick} 
       $darkMode={darkMode}
       $isSelected={isSelected}
-      $isSelectionMode={isSelectionMode}
     >
-      {isSelectionMode && (
-        <SelectionCheckbox $isSelected={isSelected}>
-          {isSelected ? <FaCheck /> : null}
-        </SelectionCheckbox>
-      )}
+      <SelectionCheckbox 
+        className="checkbox-area"
+        $isSelected={isSelected}
+        onClick={handleCheckboxClick}
+      >
+        {isSelected ? <FaCheck /> : null}
+      </SelectionCheckbox>
       <CardIcon $darkMode={darkMode}><FaCommentDots /></CardIcon>
       <CardTitle>{session.title || `Session #${session.id}`}</CardTitle>
       <CardPreview $darkMode={darkMode}>
@@ -68,14 +71,12 @@ const SessionCard = React.memo(({
           <FaRegClock />
           {timeSince(sessionDate)}
         </Timestamp>
-        {!isSelectionMode && (
         <DeleteButton onClick={(e) => {
           e.stopPropagation();
           onDelete(session.id);
         }}>
           <FaTrashAlt />
         </DeleteButton>
-        )}
       </CardFooter>
     </Card>
   );
@@ -90,7 +91,6 @@ export default function ChatSessionsList({
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState(new Set());
 
   const load = useCallback(async () => {
@@ -151,10 +151,26 @@ export default function ChatSessionsList({
         await Promise.all(selectedIds.map(id => deleteChatSession(id, token)));
         if (selectedIds.includes(selectedSession)) onSelect(null);
         setSelectedSessions(new Set());
-        setIsSelectionMode(false);
         await load();
       } catch (e) {
         console.error("일괄 삭제 실패", e);
+      }
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (sessions.length === 0) return;
+    
+    if (window.confirm(`모든 대화 이력 (${sessions.length}개)을 정말 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+      try {
+        await Promise.all(sessions.map(session => deleteChatSession(session.id, token)));
+        onSelect(null);
+        setSelectedSessions(new Set());
+        await load();
+        alert("모든 대화 이력이 삭제되었습니다.");
+      } catch (e) {
+        console.error("전체 삭제 실패", e);
+        alert("삭제 중 오류가 발생했습니다. 다시 시도해주세요.");
       }
     }
   };
@@ -169,12 +185,7 @@ export default function ChatSessionsList({
     setSelectedSessions(newSelected);
   };
 
-  const handleSelectionModeToggle = () => {
-    if (isSelectionMode) {
-      setSelectedSessions(new Set());
-    }
-    setIsSelectionMode(!isSelectionMode);
-  };
+
   
   const handleFilterChange = (e) => {
     setFilter(e.target.value);
@@ -193,20 +204,12 @@ export default function ChatSessionsList({
       <TopBar>
         <Title>대화 이력</Title>
         <ActionButtons>
-          {isSelectionMode ? (
-            <>
-              <SelectionButton onClick={handleBulkDelete} $darkMode={darkMode} $isDelete>
-                <FaTrashAlt /> 삭제 ({selectedSessions.size})
-              </SelectionButton>
-              <SelectionButton onClick={handleSelectionModeToggle} $darkMode={darkMode}>
-                <FaTimes /> 취소
-              </SelectionButton>
-            </>
-          ) : (
-            <SelectionButton onClick={handleSelectionModeToggle} $darkMode={darkMode}>
-              <FaCheck /> 선택하기
-            </SelectionButton>
-          )}
+          <SelectionButton onClick={handleDeleteAll} $darkMode={darkMode} $isDeleteAll>
+            <FaTrashAlt /> 전체 삭제
+          </SelectionButton>
+          <SelectionButton onClick={handleBulkDelete} $darkMode={darkMode} $isDelete disabled={selectedSessions.size === 0}>
+            <FaTrashAlt /> 선택 삭제{selectedSessions.size > 0 ? ` (${selectedSessions.size})` : ''}
+          </SelectionButton>
         </ActionButtons>
       </TopBar>
 
@@ -227,7 +230,6 @@ export default function ChatSessionsList({
               onSelect={onSelect}
               onDelete={handleDelete}
               darkMode={darkMode}
-              isSelectionMode={isSelectionMode}
               isSelected={selectedSessions.has(s.id)}
               onToggleSelect={handleToggleSelect}
             />
@@ -269,23 +271,24 @@ const ActionButtons = styled.div`
 `;
 
 const SelectionButton = styled.button`
-  background: ${({ $isDelete, $darkMode }) => 
-    $isDelete ? "#ef4444" : "#fbbf24"};
+  background: ${({ $isDelete, $isDeleteAll, $darkMode, disabled }) => 
+    disabled ? "#6b7280" : $isDeleteAll ? "#dc2626" : $isDelete ? "#ef4444" : "#fbbf24"};
   color: white;
   border: none;
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: ${({ disabled }) => disabled ? "not-allowed" : "pointer"};
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font-weight: bold;
   font-size: 0.9rem;
   transition: all 0.2s ease-in-out;
+  opacity: ${({ disabled }) => disabled ? 0.6 : 1};
 
-  &:hover {
-    background: ${({ $isDelete }) => 
-      $isDelete ? "#dc2626" : "#f59e0b"};
+  &:hover:not(:disabled) {
+    background: ${({ $isDelete, $isDeleteAll }) => 
+      $isDeleteAll ? "#b91c1c" : $isDelete ? "#dc2626" : "#f59e0b"};
     transform: translateY(-2px);
   }
 `;
@@ -323,9 +326,8 @@ const Card = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border: 2px solid ${({ $isSelected, $isSelectionMode, $darkMode }) => 
+  border: 2px solid ${({ $isSelected, $darkMode }) => 
     $isSelected ? "#fbbf24" : 
-    $isSelectionMode ? "#fbbf24" : 
     $darkMode ? "#333" : "#eee"};
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   cursor: pointer;
@@ -354,6 +356,13 @@ const SelectionCheckbox = styled.div`
   justify-content: center;
   color: white;
   font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3);
+  }
 `;
 
 const CardIcon = styled.div`

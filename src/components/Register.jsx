@@ -27,6 +27,24 @@ export default function Register() {
     gender: "",
   });
 
+  /* ── 생년월일 선택을 위한 상태 ─────────────── */
+  const [birthYear, setBirthYear] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+
+  /* ── 년도, 월, 일 옵션 생성 ────────────────── */
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 1930 + 1 }, (_, i) => currentYear - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  
+  // 선택된 년도와 월에 따른 일 수 계산
+  const getDaysInMonth = (year, month) => {
+    if (!year || !month) return 31;
+    return new Date(year, month, 0).getDate();
+  };
+  
+  const days = Array.from({ length: getDaysInMonth(birthYear, birthMonth) }, (_, i) => i + 1);
+
   const [passwordMatch, setPasswordMatch] = useState(true);
 
   /* ── 네이버 SDK 로드 ─────────────────────── */
@@ -43,34 +61,46 @@ export default function Register() {
     if (!window.naver) return;
     const naverLogin = new window.naver.LoginWithNaverId({
       clientId: process.env.REACT_APP_NAVER_CLIENT_ID,
-      callbackUrl: `${window.location.origin}/naver-callback`,
-      isPopup: true,
+      callbackUrl: `${window.location.origin}/navercallback`,
+      isPopup: false,
       loginButton: { color: "green", type: 3, height: 48 },
+      callbackHandle: true, // 콜백 처리를 위한 설정 추가
     });
     naverLogin.init();
   };
 
-  /* ── 네이버 콜백 처리 (기존 로직 유지) ───── */
-  useEffect(() => {
-    const listener = async () => {
-      const hash = new URLSearchParams(window.location.hash.replace("#", ""));
-      const naverToken = hash.get("access_token");
-      if (!naverToken) return;
-      try {
-        const { data } = await axios.post(
-          "http://192.168.101.51:8000/auth/login/naver",
-          { access_token: naverToken }
-        );
-        localStorage.setItem("accessToken", data.access_token);
-        alert("네이버 로그인 완료!");
-        navigate("/dashboard");
-      } catch {
-        alert("네이버 로그인 실패");
+  /* ── 네이버 콜백 처리는 별도 컴포넌트에서 처리 ───── */
+
+  /* ── 생년월일 선택 핸들러 ─────────────────── */
+  const handleBirthDateChange = (type, value) => {
+    if (type === "year") {
+      setBirthYear(value);
+      // 년도가 바뀔 때 일 초기화
+      if (birthMonth && birthDay > getDaysInMonth(value, birthMonth)) {
+        setBirthDay("");
       }
-    };
-    window.addEventListener("load", listener);
-    return () => window.removeEventListener("load", listener);
-  }, [navigate]);
+    } else if (type === "month") {
+      setBirthMonth(value);
+      // 월이 바뀔 때 일 초기화
+      if (birthDay > getDaysInMonth(birthYear, value)) {
+        setBirthDay("");
+      }
+    } else if (type === "day") {
+      setBirthDay(value);
+    }
+
+    // 년, 월, 일이 모두 선택되면 birth_date 업데이트
+    let year = type === "year" ? value : birthYear;
+    let month = type === "month" ? value : birthMonth;
+    let day = type === "day" ? value : birthDay;
+
+    if (year && month && day) {
+      const formattedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      setFormData(prev => ({ ...prev, birth_date: formattedDate }));
+    } else {
+      setFormData(prev => ({ ...prev, birth_date: "" }));
+    }
+  };
 
   /* ── 입력 핸들러 ─────────────────────────── */
   const handleChange = (e) => {
@@ -95,14 +125,6 @@ export default function Register() {
         )}`;
     }
 
-    /* 생년월일 YYYY-MM-DD 포맷팅 */
-    if (name === "birth_date") {
-      const d = value.replace(/\D/g, "");
-      if (d.length <= 4) value = d;
-      else if (d.length <= 6) value = `${d.slice(0, 4)}-${d.slice(4)}`;
-      else value = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
-    }
-
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -111,8 +133,8 @@ export default function Register() {
     const phoneDigits = formData.phone_number.replace(/-/g, "");
     if (phoneDigits.length !== 11)
       return "휴대폰 번호는 숫자 11자리여야 합니다";
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birth_date))
-      return "생년월일 형식이 올바르지 않습니다 (YYYY-MM-DD)";
+    if (!birthYear || !birthMonth || !birthDay)
+      return "생년월일을 모두 선택해주세요";
     if (!passwordMatch) return "비밀번호가 일치하지 않습니다";
     return null;
   };
@@ -158,8 +180,13 @@ export default function Register() {
 
       alert("회원가입 및 자동 로그인 완료!");
 
-      // 5) 이력서 선택 페이지로 이동
-      navigate("/resumeselect"); // Registernext 대신 이력서 선택 페이지로 이동
+      // 5) 프로필 입력 페이지로 바로 이동
+      navigate("/registernext");
+      
+      // 페이지 이동 후 스크롤을 최상단으로 이동
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
     } catch (err) {
       console.error(err.response?.data || err);
       alert("회원가입 실패: " + (err.response?.data?.detail || err.message));
@@ -254,29 +281,67 @@ export default function Register() {
             <Icon>
               <FaVenusMars />
             </Icon>
-            <Input
-              name="gender"
-              placeholder="성별 입력 (예: 남자/여자)"
-              value={formData.gender}
-              onChange={handleChange}
-              required
-            />
+            <GenderContainer>
+              <GenderLabel>성별</GenderLabel>
+              <GenderButtonContainer>
+                <GenderButton
+                  type="button"
+                  $selected={formData.gender === "남자"}
+                  onClick={() => setFormData(prev => ({ ...prev, gender: "남자" }))}
+                >
+                  남자
+                </GenderButton>
+                <GenderButton
+                  type="button"
+                  $selected={formData.gender === "여자"}
+                  onClick={() => setFormData(prev => ({ ...prev, gender: "여자" }))}
+                >
+                  여자
+                </GenderButton>
+              </GenderButtonContainer>
+            </GenderContainer>
           </InputGroup>
 
-          <InputGroup>
+          <BirthDateGroup>
             <Icon>
               <FaRegCalendarAlt />
             </Icon>
-            <Input
-              name="birth_date"
-              placeholder="YYYY-MM-DD"
-              value={formData.birth_date}
-              maxLength={10}
-              pattern="\d{4}-\d{2}-\d{2}"
-              onChange={handleChange}
-              required
-            />
-          </InputGroup>
+            <BirthDateContainer>
+              <BirthDateLabel>생년월일</BirthDateLabel>
+              <SelectContainer>
+                <Select
+                  value={birthYear}
+                  onChange={(e) => handleBirthDateChange("year", e.target.value)}
+                  required
+                >
+                  <option value="">년도</option>
+                  {years.map(year => (
+                    <option key={year} value={year}>{year}년</option>
+                  ))}
+                </Select>
+                <Select
+                  value={birthMonth}
+                  onChange={(e) => handleBirthDateChange("month", e.target.value)}
+                  required
+                >
+                  <option value="">월</option>
+                  {months.map(month => (
+                    <option key={month} value={month}>{month}월</option>
+                  ))}
+                </Select>
+                <Select
+                  value={birthDay}
+                  onChange={(e) => handleBirthDateChange("day", e.target.value)}
+                  required
+                >
+                  <option value="">일</option>
+                  {days.map(day => (
+                    <option key={day} value={day}>{day}일</option>
+                  ))}
+                </Select>
+              </SelectContainer>
+            </BirthDateContainer>
+          </BirthDateGroup>
 
           <InputGroup>
             <Icon>
@@ -393,4 +458,112 @@ const Divider = styled.hr`
 const NaverArea = styled.div`
   display: flex;
   justify-content: center;
+`;
+
+const GenderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  height: 100%;
+`;
+
+const GenderLabel = styled.span`
+  font-size: 1rem;
+  color: #aaa;
+  min-width: 2.2rem;
+  font-weight: normal;
+`;
+
+const GenderButtonContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+`;
+
+const GenderButton = styled.button`
+  padding: 0.4rem 0.8rem;
+  border: 1px solid ${props => props.$selected ? '#ffc107' : '#ddd'};
+  background: ${props => props.$selected ? '#ffc107' : '#fff'};
+  color: ${props => props.$selected ? '#fff' : '#333'};
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: ${props => props.$selected ? 'bold' : 'normal'};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 100%;
+  
+  &:hover {
+    border-color: #ffc107;
+    background: ${props => props.$selected ? '#ffd54f' : '#fff9e6'};
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.3);
+  }
+`;
+
+const BirthDateGroup = styled.div`
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  transition: border 0.2s ease;
+  &:focus-within {
+    border-color: #ffcc00;
+  }
+`;
+
+const BirthDateContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  height: 100%;
+`;
+
+const BirthDateLabel = styled.span`
+  font-size: 1rem;
+  color: #aaa;
+  min-width: 4rem;
+  font-weight: normal;
+`;
+
+const SelectContainer = styled.div`
+  display: flex;
+  gap: 0.4rem;
+  flex: 1;
+`;
+
+const Select = styled.select`
+  flex: 1;
+  padding: 0.4rem 0.3rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.85rem;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 0;
+  max-width: 5rem;
+  
+  &:focus {
+    outline: none;
+    border-color: #ffc107;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.1);
+  }
+  
+  &:hover {
+    border-color: #ffc107;
+  }
+  
+  option {
+    padding: 0.2rem;
+  }
 `;

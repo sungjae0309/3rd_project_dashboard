@@ -14,7 +14,7 @@ import Login from "./components/login";
 import Aijob from "./components/aijob";
 import NaverCallback from "./components/navercallback";
 
-import ResumeSelect from "./components/ResumeSelect";
+
 import AiJobRecommendation from "./components/AiJobRecommendation";
 import CareerPlanFlow from "./components/CareerPlanFlow"; 
 import CareerRoadmapDetail from "./components/CareerRoadmapDetail"; 
@@ -85,7 +85,7 @@ export default function App() {
       <Routes>
         {/* 기존 라우트들 */}
         <Route path="/register" element={<Register />} />
-        <Route path="/resumeselect" element={<ResumeSelect />} />
+
         <Route path="/registernext" element={<RegisterNext />} />
         <Route path="/login" element={<Login />} />
         <Route path="/logout" element={<Logout />} />

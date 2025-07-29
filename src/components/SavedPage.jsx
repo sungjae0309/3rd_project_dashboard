@@ -13,10 +13,18 @@ export default function SavedPage({
   onJobDetail,
   onRoadmapDetail,
   // ✨ 1. [추가] MainContent로부터 savedRoadmaps를 props로 받습니다.
-  savedRoadmaps 
+  savedRoadmaps,
+  // ✨ [추가] 로드맵 찜하기/해제 콜백들
+  onSaveRoadmap,
+  onUnsaveRoadmap
 }) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'jobs');
+
+  // 페이지 마운트 시 스크롤을 최상단으로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // URL 파라미터 확인하여 탭 활성화
   useEffect(() => {
@@ -65,6 +73,7 @@ export default function SavedPage({
             userId={userId} 
             onRoadmapDetail={onRoadmapDetail}
             title="찜한 부트캠프"
+            onUnsaveRoadmap={onUnsaveRoadmap}
           />
         )}
         {activeTab === 'courses' && (
@@ -74,6 +83,7 @@ export default function SavedPage({
             userId={userId} 
             onRoadmapDetail={onRoadmapDetail}
             title="찜한 강의"
+            onUnsaveRoadmap={onUnsaveRoadmap}
           />
         )}
       </ContentArea>

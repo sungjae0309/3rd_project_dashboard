@@ -38,6 +38,7 @@ export default function TodoList({ darkMode = false }) {
   const [genJob, setGenJob] = useState('');
   const [genDays, setGenDays] = useState('15');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedScheduleInfo, setGeneratedScheduleInfo] = useState(null); // 생성된 일정 정보
 
   // 데이터 조회 함수
   const fetchTodos = useCallback(async () => {
@@ -63,6 +64,12 @@ export default function TodoList({ darkMode = false }) {
               completed_count: response.data.completed_count || 0,
               pending_count: response.data.pending_count || 0,
           });
+          
+          // 전체 일정이 없으면 저장된 정보도 제거 (필터링이 아닌 실제 전체 일정 기준)
+          if (response.data.total_count === 0) {
+              setGeneratedScheduleInfo(null);
+              localStorage.removeItem('generatedScheduleInfo');
+          }
       } catch (err) {
           console.error("할 일 목록 조회 실패:", err);
       } finally {
@@ -71,6 +78,18 @@ export default function TodoList({ darkMode = false }) {
   }, [filters]);
 
   useEffect(() => {
+      // 페이지 로드 시 저장된 일정 정보 먼저 복원
+      const savedScheduleInfo = localStorage.getItem('generatedScheduleInfo');
+      if (savedScheduleInfo) {
+          try {
+              const parsedInfo = JSON.parse(savedScheduleInfo);
+              setGeneratedScheduleInfo(parsedInfo);
+          } catch (error) {
+              console.error('저장된 일정 정보 파싱 실패:', error);
+              localStorage.removeItem('generatedScheduleInfo');
+          }
+      }
+      
       fetchTodos();
   }, [fetchTodos]);
       
@@ -106,19 +125,70 @@ export default function TodoList({ darkMode = false }) {
     // AI 일정 생성 핸들러
     const handleGenerate = async () => {
         if (!genJob) return alert("직무를 선택해주세요.");
+        if (!genDays || +genDays < 1 || +genDays > 60) return alert("기간은 1-60일 사이로 입력해주세요.");
+        
         setIsGenerating(true);
         const token = localStorage.getItem("accessToken");
         try {
+            // TodoPreview와 동일한 방식으로 수정 (query parameter 사용)
             await axios.post(`${BASE_URL}/todo-list/generate`, 
-                { job_title: genJob, days: Number(genDays) }, 
-                { headers: { Authorization: `Bearer ${token}` } }
+                {}, // Request Body는 비워둡니다.
+                { 
+                    headers: { Authorization: `Bearer ${token}` },
+                    // params 옵션을 사용하여 쿼리 파라미터로 전송합니다.
+                    params: {
+                        job_title: genJob,
+                        days: Number(genDays)
+                    }
+                }
             );
+            
+            // 생성 성공 시 일정 정보 저장
+            const scheduleInfo = {
+                job_title: genJob,
+                days: genDays,
+                created_at: new Date().toLocaleDateString()
+            };
+            setGeneratedScheduleInfo(scheduleInfo);
+            localStorage.setItem('generatedScheduleInfo', JSON.stringify(scheduleInfo));
+            
             fetchTodos(); // 성공 후 목록 새로고침
+            alert("일정이 성공적으로 생성되었습니다!");
         } catch (err) {
-            alert("일정 생성 실패");
+            alert("일정 생성에 실패했습니다. 이미 생성된 일정이 있는지 확인해주세요.");
             console.error("생성 실패", err);
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    // 전체 일정 삭제 핸들러
+    const handleDeleteAllSchedule = async () => {
+        if (!window.confirm("모든 일정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+            return;
+        }
+        
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+            alert("로그인이 필요합니다.");
+            return;
+        }
+        
+        try {
+            await axios.delete(`${BASE_URL}/todo-list/clear`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // 삭제 후 상태 초기화
+            setGeneratedScheduleInfo(null);
+            setGenJob('');
+            setGenDays('15');
+            localStorage.removeItem('generatedScheduleInfo');
+            fetchTodos();
+            alert("모든 일정이 삭제되었습니다.");
+        } catch (err) {
+            console.error("일정 삭제 실패:", err);
+            alert("일정 삭제에 실패했습니다.");
         }
     };
 
@@ -189,19 +259,44 @@ export default function TodoList({ darkMode = false }) {
               <LeftPanel>
                     {/* AI 일정 생성 섹션 */}
                     <ControlBox>
-                        <h4><FaCalendarAlt /> AI 학습 일정 생성</h4>
-                        <p>찜한 로드맵과 공고 기반으로 맞춤 일정을 생성합니다.</p>
-                        <InputRow>
-                            <Select value={genJob} onChange={e => setGenJob(e.target.value)}>
-                                <option value="">직무 선택</option>
-                                {jobNamesList.map(job => <option key={job} value={job}>{job}</option>)}
-                            </Select>
-                            <Input type="number" value={genDays} onChange={e => setGenDays(e.target.value)} style={{width: '80px'}} />
-                            <span>일</span>
-                        </InputRow>
-                        <GenerateButton onClick={handleGenerate} disabled={isGenerating}>
-                            {isGenerating ? "생성 중..." : "일정 생성"}
-                        </GenerateButton>
+                        {(generatedScheduleInfo || stats.total_count > 0) ? (
+                            // 생성된 일정 정보 표시
+                            <>
+                                <ScheduleInfoHeader>
+                                    <h4><FaCalendarAlt /> 생성된 학습 일정</h4>
+                                    <ScheduleDeleteButton onClick={handleDeleteAllSchedule}>
+                                        <FaTrash />
+                                    </ScheduleDeleteButton>
+                                </ScheduleInfoHeader>
+                                <ScheduleInfoContent>
+                                    <ScheduleInfoItem>
+                                        <ScheduleInfoLabel>직무:</ScheduleInfoLabel>
+                                        <ScheduleInfoValue>{generatedScheduleInfo?.job_title || "AI 추천"}</ScheduleInfoValue>
+                                    </ScheduleInfoItem>
+                                    <ScheduleInfoItem>
+                                        <ScheduleInfoLabel>기간:</ScheduleInfoLabel>
+                                        <ScheduleInfoValue>{generatedScheduleInfo?.days || "15"}일</ScheduleInfoValue>
+                                    </ScheduleInfoItem>
+                                </ScheduleInfoContent>
+                            </>
+                        ) : (
+                            // 일정 생성 폼
+                            <>
+                                <h4><FaCalendarAlt /> AI 학습 일정 생성</h4>
+                                <p>찜한 로드맵과 공고 기반으로 맞춤 일정을 생성합니다.</p>
+                                <InputRow>
+                                    <Select value={genJob} onChange={e => setGenJob(e.target.value)}>
+                                        <option value="">직무 선택</option>
+                                        {jobNamesList.map(job => <option key={job} value={job}>{job}</option>)}
+                                    </Select>
+                                    <Input type="number" value={genDays} onChange={e => setGenDays(e.target.value)} style={{width: '130px'}} />
+                                    <span>일</span>
+                                </InputRow>
+                                <GenerateButton onClick={handleGenerate} disabled={isGenerating}>
+                                    {isGenerating ? "생성 중..." : "일정 생성"}
+                                </GenerateButton>
+                            </>
+                        )}
                     </ControlBox>
                     
                     {/* 캘린더 섹션 */}
@@ -268,7 +363,7 @@ export default function TodoList({ darkMode = false }) {
                                 <TaskItem key={todo.id} $isCompleted={todo.is_completed}>
                                     <Checkbox onClick={() => handleToggle(todo.id)} $isCompleted={todo.is_completed} />
                                     <TaskContent>
-                                        <TaskTitle>{todo.title}</TaskTitle>
+                                        <TaskTitle $isCompleted={todo.is_completed}>{todo.title}</TaskTitle>
                                         <TaskPriority $priority={todo.priority}>{todo.priority}</TaskPriority>
                                     </TaskContent>
                                     <ActionButtons>
@@ -290,6 +385,7 @@ export default function TodoList({ darkMode = false }) {
 const PageContainer = styled.div`
     padding: 2rem;
     background: ${({ $darkMode }) => $darkMode ? '#1e1e1e' : '#f8f9fa'};
+    overflow-x: hidden;
 `;
 const HeaderRow = styled.div`
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;
@@ -320,7 +416,7 @@ const InputRow = styled.div`
     display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;
 `;
 const Select = styled.select`
-    flex: 1; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #ccc;
+    width: 130px; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #ccc;
 `;
 const Input = styled.input`
     padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #ccc;
@@ -371,19 +467,42 @@ const TaskItem = styled.div`
     display: flex; align-items: center; gap: 1rem;
     padding: 1rem; border-radius: 0.5rem;
     background: ${({ $darkMode, $isCompleted }) => $isCompleted ? 'rgba(0,0,0,0.1)' : ($darkMode ? '#333' : '#f8f9fa')};
-    text-decoration: ${({ $isCompleted }) => $isCompleted ? 'line-through' : 'none'};
     color: ${({ $isCompleted }) => $isCompleted ? '#888' : 'inherit'};
 `;
 const Checkbox = styled.div`
-    width: 20px; height: 20px; border-radius: 5px; cursor: pointer;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
     border: 2px solid ${({ $isCompleted }) => $isCompleted ? '#2ecc71' : '#ccc'};
-    background: ${({ $isCompleted }) => $isCompleted ? '#2ecc71' : 'transparent'};
+    background-color: ${({ $isCompleted }) => $isCompleted ? '#2ecc71' : 'transparent'};
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    &:hover {
+        border-color: #2ecc71;
+        transform: scale(1.1);
+    }
+    
+    &::after {
+        content: '✓';
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        opacity: ${({ $isCompleted }) => $isCompleted ? 1 : 0};
+        transition: opacity 0.2s ease;
+    }
 `;
 const TaskContent = styled.div`
     flex: 1;
 `;
 const TaskTitle = styled.div`
     font-weight: 600;
+    text-decoration: ${({ $isCompleted }) => $isCompleted ? 'line-through' : 'none'};
 `;
 const TaskPriority = styled.span`
     font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 0.5rem;
@@ -440,4 +559,72 @@ const SortButton = styled.button`
     &:hover {
         background: #f0f0f0;
     }
+`;
+
+// 생성된 일정 정보 스타일
+const ScheduleInfoHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    
+    h4 {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #333;
+        font-size: 1rem;
+    }
+`;
+
+const ScheduleDeleteButton = styled.button`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.5rem;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    
+    &:hover {
+        background: #ff4757;
+        color: white;
+        transform: scale(1.05);
+    }
+`;
+
+const ScheduleInfoContent = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+`;
+
+const ScheduleInfoItem = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+    
+    &:last-child {
+        border-bottom: none;
+    }
+`;
+
+const ScheduleInfoLabel = styled.span`
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+`;
+
+const ScheduleInfoValue = styled.span`
+    color: #333;
+    font-weight: 500;
+    font-size: 0.9rem;
 `;

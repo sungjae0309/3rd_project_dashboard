@@ -3,14 +3,14 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { css, keyframes } from "styled-components";
 import axios from "axios";
-import { FaChevronDown, FaSearch } from "react-icons/fa";
+import { FaChevronDown, FaSearch, FaCertificate, FaLanguage, FaTrash, FaCalendarAlt, FaPlus } from "react-icons/fa";
 
 const DEGREE_OPTIONS = [ { value: "", label: "선택" }, { value: "고등학교", label: "고등학교" }, { value: "대학교2", label: "대학교(2년제)" }, { value: "대학교4", label: "대학교(4년제)" }, { value: "대학원", label: "대학원" }, ];
 const DEGREE_MAP = { 고등학교:"고졸", 대학교2:"학사", 대학교4:"학사", 대학원:"석사" };
 const EDU_STATUS_OPTIONS = { 고등학교: [{ value:"졸업", label:"졸업" }], 대학교2: ["재학","휴학","졸업"].map(v=>({value:v,label:v})), 대학교4: ["재학","휴학","졸업"].map(v=>({value:v,label:v})), 대학원:  ["재학","휴학","졸업"].map(v=>({value:v,label:v})), };
 const EXP_MAIN = ["인턴","부트캠프","프로젝트","대외활동"];
 const EXP_SUB_ACTIVITY = ["동아리","학회","공모전"];
-const SKILL_LEVELS = ["입문자","기초","중급","고급","전문가"];
+const SKILL_LEVELS = ["초급","중급","고급"];
 // Before
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
@@ -30,11 +30,17 @@ export default function RegisterNext() {
   
   // 기술 스택 검색 관련 상태
   const [skillSearchTerm, setSkillSearchTerm] = useState("");
-  const [skillSearchCategory, setSkillSearchCategory] = useState("스킬");
+
   const [skillSearchResults, setSkillSearchResults] = useState([]);
   const [skillSearchOpen, setSkillSearchOpen] = useState(false);
-  const [activeSearchCategory, setActiveSearchCategory] = useState("스킬");
-  const [showAutoComplete, setShowAutoComplete] = useState(false);
+  const [activeSearchCategory, setActiveSearchCategory] = useState("전체");
+
+  const [modalFilterCategory, setModalFilterCategory] = useState("전체"); // 팝업 내 필터링 상태
+
+  // 자격증 팝업 관련 상태
+  const [certSearchOpen, setCertSearchOpen] = useState(false);
+  const [certSearchTerm, setCertSearchTerm] = useState("");
+  const [currentCertIndex, setCurrentCertIndex] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -51,6 +57,11 @@ export default function RegisterNext() {
         setSkillsAll(skills.data || []);
       } catch (err) { console.error("목록 로딩 실패:", err.response?.status, err.response?.data); }
     })();
+  }, []);
+
+  // 페이지 마운트 시 스크롤을 최상단으로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
 
   const handleChange = e => setResume(p=>({...p,[e.target.name]:e.target.value}));
@@ -87,36 +98,40 @@ export default function RegisterNext() {
     }, {});
   }, [skillsAll]);
 
-  // 기술 스택 검색 필터링 (자동완성용)
-  const autoCompleteSkills = useMemo(() => {
-    if (!skillSearchTerm.trim()) return [];
-    
-    // 현재 활성화된 카테고리의 기술만 검색
-    const skillsToSearch = skillsAll.filter(skill => skill.category === activeSearchCategory);
-    
-    // 검색어 필터링
-    return skillsToSearch.filter(skill => 
-      skill.name.toLowerCase().includes(skillSearchTerm.toLowerCase())
-    ).slice(0, 5); // 자동완성은 최대 5개만 표시
-  }, [skillsAll, skillSearchTerm, activeSearchCategory]);
+
 
   // 기술 스택 검색 필터링 (팝업용)
   const filteredSkills = useMemo(() => {
-    if (!skillSearchTerm.trim()) return [];
+    // "전체" 카테고리일 때는 검색어가 없어도 모든 데이터 표시
+    if (activeSearchCategory === "전체") {
+      const allSkills = skillsAll;
+      // 검색어가 있으면 필터링, 없으면 모든 데이터 반환
+      return skillSearchTerm.trim() 
+        ? allSkills.filter(skill => skill.name.toLowerCase().includes(skillSearchTerm.toLowerCase()))
+        : allSkills;
+    }
     
-    // 현재 활성화된 카테고리의 기술만 검색
+    // 개별 카테고리일 때도 검색어 없이 해당 카테고리 모든 기술 표시
     const skillsToSearch = skillsAll.filter(skill => skill.category === activeSearchCategory);
     
-    // 검색어 필터링
-    return skillsToSearch.filter(skill => 
-      skill.name.toLowerCase().includes(skillSearchTerm.toLowerCase())
-    );
+    // 검색어가 있으면 필터링, 없으면 해당 카테고리의 모든 기술 반환
+    return skillSearchTerm.trim() 
+      ? skillsToSearch.filter(skill => skill.name.toLowerCase().includes(skillSearchTerm.toLowerCase()))
+      : skillsToSearch;
   }, [skillsAll, skillSearchTerm, activeSearchCategory]);
 
   // 검색 결과 업데이트
   useEffect(() => {
     setSkillSearchResults(filteredSkills);
   }, [filteredSkills]);
+
+  // 팝업 내 필터링된 결과 계산
+  const modalFilteredSkills = useMemo(() => {
+    if (modalFilterCategory === "전체") {
+      return skillSearchResults;
+    }
+    return skillSearchResults.filter(skill => skill.category === modalFilterCategory);
+  }, [skillSearchResults, modalFilterCategory]);
 
 
 
@@ -125,25 +140,20 @@ export default function RegisterNext() {
     e.preventDefault(); // 폼 제출 방지
     setActiveSearchCategory(category);
     setSkillSearchTerm("");
-    setSkillSearchOpen(false);
-    setShowAutoComplete(false);
+    
+    // 모든 카테고리에서 팝업 열기
+    if (category === "전체") {
+      setModalFilterCategory("전체"); // 팝업 필터 초기화
+    } else {
+      setModalFilterCategory(category); // 해당 카테고리로 필터 설정
+    }
+    setSkillSearchOpen(true);
   };
 
   // 기술 스택 검색 핸들러
   const handleSkillSearch = (e) => {
     const value = e.target.value;
     setSkillSearchTerm(value);
-    setShowAutoComplete(value.length > 0);
-    setSkillSearchOpen(false);
-  };
-
-  // 엔터 키 핸들러
-  const handleSkillSearchKeyPress = (e) => {
-    if (e.key === 'Enter' && skillSearchTerm.trim()) {
-      e.preventDefault();
-      setSkillSearchOpen(true);
-      setShowAutoComplete(false);
-    }
   };
 
   // 기술 스택 선택 핸들러
@@ -153,12 +163,33 @@ export default function RegisterNext() {
     } else {
       setSelectedSkills(prev => [...prev, { name: skill.name, level: "" }]);
     }
-    setSkillSearchTerm("");
-    setSkillSearchOpen(false);
+    // 팝업창을 닫지 않고 여러 항목 선택 가능하도록 수정
   };
 
   const removeSkill = name => setSelectedSkills(p=>p.filter(s=>s.name!==name));
   const setSkillLevel = (name,lvl)=>setSelectedSkills(p=>p.map(s=>s.name===name?{...s,level:lvl}:s));
+
+  // 자격증 팝업 관련 핸들러
+  const handleCertSearchOpen = (index) => {
+    setCurrentCertIndex(index);
+    setCertSearchTerm("");
+    setCertSearchOpen(true);
+  };
+
+  const handleCertSearch = (e) => {
+    setCertSearchTerm(e.target.value);
+  };
+
+  const handleCertSelect = (certName) => {
+    handleCertValue(currentCertIndex, certName);
+    setCertSearchOpen(false);
+    setCertSearchTerm("");
+  };
+
+  // 자격증 검색 결과 필터링
+  const filteredCerts = certListAll.filter(cert => 
+    cert.toLowerCase().includes(certSearchTerm.toLowerCase())
+  );
 
   const triggerSimilarityCalculation = async (token) => {
     try {
@@ -220,7 +251,7 @@ export default function RegisterNext() {
       working_year: resume.career_type === "경력" ? String(resume.career_years || "") : "신입",
       
       language_score: parseLanguageScores(resume.language_score),
-      skills: selectedSkills.map(s => ({ skill_name: s.name, proficiency: s.level || "입문자" })),
+      skills: selectedSkills.map(s => ({ skill_name: s.name, proficiency: s.level || "초급" })),
       certificates: certificates.filter(c => c.type && c.value && c.date).map(c => ({ certificate_name: c.value, acquired_date: c.date })),
       experience: experiences.filter(e => e.type && e.name).map(({ type, subType, name, period, description, award }) => ({
         type: subType ? `${type}-${subType}` : type, name, period,
@@ -268,48 +299,178 @@ export default function RegisterNext() {
         <Divider/>
         <FormContainer onSubmit={handleSubmit} autoComplete="off">
           <Section>
-            <SectionTitle>최종 학력</SectionTitle>
-            <FlexRow>
-              <Label>학력</Label>
-              <Select value={resume.degree} onChange={handleDegreeChange}>
-                {DEGREE_OPTIONS.map(o=>(<option key={o.value} value={o.value}>{o.label}</option>))}
-              </Select>
-              <Select name="education_status" value={resume.education_status} onChange={handleChange} disabled={!resume.degree} style={{width:"45%",marginLeft:"1rem"}}>
-                <option value="">학적 상태</option>
-                {(EDU_STATUS_OPTIONS[resume.degree]||[]).map(o=>(<option key={o.value} value={o.value}>{o.label}</option>))}
-              </Select>
-            </FlexRow>
-            <FlexRow>
-              <Label>구분</Label>
-              <Select name="career_type" value={resume.career_type} onChange={handleChange} style={{width:"140px"}}>
-                <option value="신입">신입</option><option value="경력">경력</option>
-              </Select>
-              <Select name="career_years" value={resume.career_years} onChange={handleChange} disabled={resume.career_type!=="경력"} style={{width:"45%",marginLeft:"1rem"}}>
-                <option value="">년차 선택</option>
-                {Array.from({length:30},(_,i)=>i+1).map(y=>(<option key={y} value={y}>{y}년차</option>))}
-              </Select>
-            </FlexRow>
-            <FlexRow><Label>학교명</Label><Input name="university" value={resume.university} onChange={handleChange} disabled={isHighSchoolGraduate}/></FlexRow>
-            <FlexRow><Label>전공</Label><Input name="major" value={resume.major} onChange={handleChange} disabled={isHighSchoolGraduate}/></FlexRow>
-            <FlexRow><Label>학점</Label><Input name="gpa" value={resume.gpa} onChange={handleChange} disabled={isHighSchoolGraduate} inputMode="decimal" placeholder="3.5"/></FlexRow>
+            <SectionTitle>
+              최종 학력
+              <RequiredBadge>필수</RequiredBadge>
+            </SectionTitle>
+            <EducationCard>
+              <EducationRow>
+                <EducationFieldWrapper>
+                  <EducationLabel>학력</EducationLabel>
+                  <EducationSelect value={resume.degree} onChange={handleDegreeChange}>
+                    {DEGREE_OPTIONS.map(o=>(<option key={o.value} value={o.value}>{o.label}</option>))}
+                  </EducationSelect>
+                </EducationFieldWrapper>
+                <EducationFieldWrapper>
+                  <EducationLabel>학적 상태</EducationLabel>
+                  <EducationSelect name="education_status" value={resume.education_status} onChange={handleChange} disabled={!resume.degree}>
+                    <option value="">학적 상태</option>
+                    {(EDU_STATUS_OPTIONS[resume.degree]||[]).map(o=>(<option key={o.value} value={o.value}>{o.label}</option>))}
+                  </EducationSelect>
+                </EducationFieldWrapper>
+              </EducationRow>
+              
+              <EducationRow>
+                <EducationFieldWrapper>
+                  <EducationLabel>구분</EducationLabel>
+                  <EducationSelect name="career_type" value={resume.career_type} onChange={handleChange}>
+                    <option value="신입">신입</option><option value="경력">경력</option>
+                  </EducationSelect>
+                </EducationFieldWrapper>
+                <EducationFieldWrapper>
+                  <EducationLabel>경력 년차</EducationLabel>
+                  <EducationSelect name="career_years" value={resume.career_years} onChange={handleChange} disabled={resume.career_type!=="경력"}>
+                    <option value="">년차 선택</option>
+                    {Array.from({length:30},(_,i)=>i+1).map(y=>(<option key={y} value={y}>{y}년차</option>))}
+                  </EducationSelect>
+                </EducationFieldWrapper>
+              </EducationRow>
+              
+              <EducationRow>
+                <EducationFieldWrapper>
+                  <EducationLabel>학교명</EducationLabel>
+                  <EducationInput name="university" value={resume.university} onChange={handleChange} disabled={isHighSchoolGraduate} placeholder="학교를 입력하세요"/>
+                </EducationFieldWrapper>
+                <EducationFieldWrapper>
+                  <EducationLabel>전공</EducationLabel>
+                  <EducationInput name="major" value={resume.major} onChange={handleChange} disabled={isHighSchoolGraduate} placeholder="전공을 입력하세요"/>
+                </EducationFieldWrapper>
+              </EducationRow>
+              
+              <EducationRow>
+                <EducationFieldWrapper style={{flex: 1}}>
+                  <EducationLabel>학점</EducationLabel>
+                  <EducationInput name="gpa" value={resume.gpa} onChange={handleChange} disabled={isHighSchoolGraduate} inputMode="decimal" placeholder="3.5"/>
+                </EducationFieldWrapper>
+                <div style={{flex: 1}}></div>
+              </EducationRow>
+            </EducationCard>
           </Section>
 
           <Section>
-            <SectionTitle>자격증 / 어학</SectionTitle>
-            <datalist id="cert-datalist">{certListAll.map(n=><option key={n} value={n}/>)}</datalist>
+            <SectionTitle>
+              자격증 / 어학
+              <OptionalBadge>선택</OptionalBadge>
+            </SectionTitle>
+
             {certificates.map((c,idx)=>(
-              <ExpRow key={idx}>
-                <Select value={c.type} onChange={e=>handleCertType(idx,e.target.value)} style={{width:"30%"}}><option value="">유형</option><option value="자격증">자격증</option><option value="어학점수">어학점수</option></Select>
-                <Input list="cert-datalist" placeholder={c.type==="어학점수"?"TOEIC 900":"정보처리기사 1급"} value={c.value} onChange={e=>handleCertValue(idx,e.target.value)}/>
-                <Input type="date" value={c.date||""} onChange={e=>handleCertDate(idx,e.target.value)} style={{width:"35%"}}/>
-                <RemoveBtn type="button" onClick={(e)=>removeCert(idx, e)}>삭제</RemoveBtn>
-              </ExpRow>
+              <CertificateCard key={idx}>
+                <CertificateTopRow>
+                  <CertificateSelect value={c.type} onChange={e=>handleCertType(idx,e.target.value)}>
+                    <option value="">유형 선택</option>
+                    <option value="자격증">자격증</option>
+                    <option value="어학점수">어학점수</option>
+                  </CertificateSelect>
+                  <CertificateRemoveBtn type="button" onClick={(e)=>removeCert(idx, e)}>
+                    <FaTrash />
+                  </CertificateRemoveBtn>
+                </CertificateTopRow>
+                
+                <CertificateInputRow>
+                  <CertificateInputWrapper>
+                    <CertificateInputLabel>
+                      {c.type === "" ? "유형" : c.type === "어학점수" ? "어학 시험" : "자격증"}
+                    </CertificateInputLabel>
+                    <CertificateInputContainer>
+                      <CertificateInput 
+                        placeholder={
+                          c.type === "" ? "유형을 선택하세요" :
+                          c.type === "어학점수" ? "TOEIC 900" : 
+                          "정보처리기사 1급"
+                        } 
+                        value={c.value} 
+                        onChange={e=>handleCertValue(idx,e.target.value)}
+                        disabled={c.type === ""}
+                      />
+                      {c.type !== "어학점수" && c.type !== "" && (
+                        <CertificatePlusButton 
+                          type="button"
+                          onClick={() => handleCertSearchOpen(idx)}
+                        >
+                          <FaPlus />
+                        </CertificatePlusButton>
+                      )}
+                    </CertificateInputContainer>
+                  </CertificateInputWrapper>
+                  
+                  <DateInputWrapper>
+                    <DateInputLabel>취득일</DateInputLabel>
+                    <CertificateDateInput 
+                      type="date" 
+                      value={c.date||""} 
+                      onChange={e=>handleCertDate(idx,e.target.value)}
+                    />
+                  </DateInputWrapper>
+                </CertificateInputRow>
+              </CertificateCard>
             ))}
-            <AddBtn type="button" onClick={addCert}>+ 항목 추가</AddBtn>
+            <CertificateAddBtn type="button" onClick={addCert}>
+              <span>+ 자격증/어학 추가</span>
+            </CertificateAddBtn>
+
+            {/* 자격증 검색 팝업 */}
+            {certSearchOpen && (
+              <CertSearchModal>
+                <CertModalContent>
+                  <CertModalHeader>
+                    <CertModalTitle>
+                      자격증 선택
+                    </CertModalTitle>
+                    <CertModalHeaderRight>
+                      <CertModalSearchInput
+                        type="text"
+                        placeholder="자격증으로 검색..."
+                        value={certSearchTerm}
+                        onChange={handleCertSearch}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <CertModalClose onClick={() => setCertSearchOpen(false)}>×</CertModalClose>
+                    </CertModalHeaderRight>
+                  </CertModalHeader>
+                  
+                  {filteredCerts.length > 0 ? (
+                    <CertModalBody>
+                      <CertResultsGrid>
+                        {filteredCerts.map((cert, index) => (
+                          <CertCategoryItem
+                            key={index}
+                            onClick={() => handleCertSelect(cert)}
+                          >
+                            <CertResultName>{cert}</CertResultName>
+                          </CertCategoryItem>
+                        ))}
+                      </CertResultsGrid>
+                    </CertModalBody>
+                  ) : (
+                    <CertModalBody>
+                      <CertNoResults>
+                        {certSearchTerm.trim() 
+                          ? `"${certSearchTerm}"에 대한 검색 결과가 없습니다.`
+                          : "표시할 자격증이 없습니다."
+                        }
+                      </CertNoResults>
+                    </CertModalBody>
+                  )}
+                </CertModalContent>
+              </CertSearchModal>
+            )}
           </Section>
 
           <Section>
-            <SectionTitle>경험</SectionTitle>
+            <SectionTitle>
+              경험
+              <OptionalBadge>선택</OptionalBadge>
+            </SectionTitle>
             {experiences.map((exp,idx)=>(
               <ExpCard key={idx}>
                 <Select value={exp.type} onChange={e=>handleExpChange(idx,"type",e.target.value)}>
@@ -324,139 +485,205 @@ export default function RegisterNext() {
                 {experiences.length>1 && <RemoveBtn type="button" onClick={()=>removeExperience(idx)}>경험 삭제</RemoveBtn>}
               </ExpCard>
             ))}
-            <AddBtn type="button" onClick={addExperience}>+ 경험 추가</AddBtn>
+            <ExperienceAddBtn type="button" onClick={addExperience}>
+              <span>+ 경험 추가</span>
+            </ExperienceAddBtn>
           </Section>
 
           <Section>
-            <SectionTitle>관심 직무</SectionTitle>
-            <DropdownCard>
-              <DropdownHeader onClick={()=>setJobOpen(o=>!o)}>
-                <span>{selectedJobs.length ? `${selectedJobs.length}개 선택됨` : "관심 직무 선택"}</span>
-                <DropdownIcon open={jobOpen}><FaChevronDown/></DropdownIcon>
-              </DropdownHeader>
-              {jobOpen && (<DropdownBody>{jobNamesAll.map(job=>(<DropdownItem key={job} selected={selectedJobs.includes(job)}><input type="checkbox" checked={selectedJobs.includes(job)} onChange={()=>toggleJob(job)}/><span>{job}</span></DropdownItem>))}</DropdownBody>)}
-              {selectedJobs.length>0 && (<TagWrap>{selectedJobs.map(job=><Tag key={job} onClick={()=>toggleJob(job)}>{job} ×</Tag>)}</TagWrap>)}
-            </DropdownCard>
+            <SectionTitle>
+              관심 직무
+              <OptionalBadge>선택</OptionalBadge>
+            </SectionTitle>
+            <JobCard>
+              <JobDropdownHeader onClick={()=>setJobOpen(o=>!o)}>
+                <JobHeaderText>
+                  {selectedJobs.length ? `${selectedJobs.length}개 직무 선택됨` : "관심 직무를 선택해주세요"}
+                </JobHeaderText>
+                <JobDropdownIcon open={jobOpen}>
+                  <FaChevronDown/>
+                </JobDropdownIcon>
+              </JobDropdownHeader>
+              
+                             <JobDropdownBody open={jobOpen}>
+                 <JobGridContainer open={jobOpen}>
+                   {jobNamesAll.map((job, index)=>(
+                     <JobItem 
+                       key={job} 
+                       selected={selectedJobs.includes(job)}
+                       onClick={()=>toggleJob(job)}
+                       animationDelay={index * 0.02}
+                       open={jobOpen}
+                     >
+                       <JobCheckbox checked={selectedJobs.includes(job)} />
+                       <JobItemText>{job}</JobItemText>
+                     </JobItem>
+                   ))}
+                 </JobGridContainer>
+               </JobDropdownBody>
+              
+              {selectedJobs.length>0 && (
+                <SelectedJobsContainer>
+                  <SelectedJobsTitle>선택된 직무</SelectedJobsTitle>
+                  <JobTagContainer>
+                    {selectedJobs.map(job=>(
+                      <JobTag key={job} onClick={()=>toggleJob(job)}>
+                        {job} ×
+                      </JobTag>
+                    ))}
+                  </JobTagContainer>
+                </SelectedJobsContainer>
+              )}
+            </JobCard>
           </Section>
           
           <Section>
-            <SectionTitle>기술 스택</SectionTitle>
-            <SkillCard>
+            <SectionTitle>
+              기술 스택
+              <OptionalBadge>선택</OptionalBadge>
+            </SectionTitle>
+            <TechStackCard>
               {/* 카테고리 탭 */}
-              <SkillCategoryTabs>
+              <TechCategoryContainer>
+                <TechCategoryTab
+                  key="전체"
+                  type="button"
+                  active={activeSearchCategory === "전체"}
+                  onClick={(e) => handleSkillCategoryChange("전체", e)}
+                >
+                  전체
+                </TechCategoryTab>
                 {Object.keys(groupedSkills).map(category => (
-                  <SkillCategoryTab
+                  <TechCategoryTab
                     key={category}
                     type="button"
                     active={activeSearchCategory === category}
                     onClick={(e) => handleSkillCategoryChange(category, e)}
                   >
                     {category}
-                  </SkillCategoryTab>
+                  </TechCategoryTab>
                 ))}
-              </SkillCategoryTabs>
+              </TechCategoryContainer>
 
-              {/* 검색 입력 영역 */}
-              <SkillSearchContainer>
-                <SkillSearchWrapper>
-                  <SearchIcon>
-                    <FaSearch />
-                  </SearchIcon>
-                  <SkillSearchInput
-                    type="text"
-                    placeholder={`${activeSearchCategory} 검색...`}
-                    value={skillSearchTerm}
-                    onChange={handleSkillSearch}
-                    onKeyPress={handleSkillSearchKeyPress}
-                    onFocus={() => setShowAutoComplete(skillSearchTerm.length > 0)}
-                  />
-                </SkillSearchWrapper>
-                
-                {/* 상세 보기 버튼 */}
-                <DetailViewButton
-                  type="button"
-                  onClick={() => setSkillSearchOpen(true)}
-                  disabled={!skillSearchTerm.trim()}
-                >
-                  상세 보기
-                </DetailViewButton>
-              </SkillSearchContainer>
-
-              {/* 자동완성 드롭다운 */}
-              {showAutoComplete && autoCompleteSkills.length > 0 && (
-                <AutoCompleteDropdown>
-                  {autoCompleteSkills.map(skill => (
-                    <AutoCompleteItem
-                      key={skill.id}
-                      onClick={() => handleSkillSelect(skill)}
-                      selected={selectedSkills.some(s => s.name === skill.name)}
-                    >
-                      <span>{skill.name}</span>
-                      {selectedSkills.some(s => s.name === skill.name) && (
-                        <span className="selected">✓</span>
-                      )}
-                    </AutoCompleteItem>
-                  ))}
-                </AutoCompleteDropdown>
+              {/* 안내 메시지 - 선택된 기술이 없을 때만 표시 */}
+              {selectedSkills.length === 0 && (
+                <TechGuideContainer>
+                  <TechGuideIcon>💡</TechGuideIcon>
+                  <TechGuideText>
+                    위 카테고리를 클릭하여 기술 스택을 선택하세요
+                  </TechGuideText>
+                </TechGuideContainer>
               )}
+
+
 
               {/* 선택된 기술 스택 표시 */}
               {selectedSkills.length > 0 && (
-                <SelectedSkillsContainer>
-                  <SelectedSkillsTitle>선택된 기술 스택</SelectedSkillsTitle>
-                  {selectedSkills.map(skill => (
-                    <SkillWithLevel key={skill.name}>
-                      <SkillTag onClick={() => removeSkill(skill.name)}>
-                        {skill.name} ×
-                      </SkillTag>
-                      <SkillLevelSelect
-                        value={skill.level}
-                        onChange={(e) => setSkillLevel(skill.name, e.target.value)}
-                      >
-                        <option value="">숙련도 선택</option>
-                        {SKILL_LEVELS.map(level => (
-                          <option key={level} value={level}>{level}</option>
-                        ))}
-                      </SkillLevelSelect>
-                    </SkillWithLevel>
-                  ))}
-                </SelectedSkillsContainer>
+                <SelectedTechContainer>
+                  <SelectedTechHeader>
+                    <SelectedTechTitle>선택된 기술 스택</SelectedTechTitle>
+                    <SelectedTechCount>{selectedSkills.length}개</SelectedTechCount>
+                  </SelectedTechHeader>
+                  <TechSkillsList>
+                    {selectedSkills.map(skill => (
+                      <TechSkillItem key={skill.name}>
+                        <TechSkillInfo>
+                          <TechSkillNameContainer>
+                            <TechSkillNameText>{skill.name}</TechSkillNameText>
+                            <TechSkillRemove onClick={() => removeSkill(skill.name)}>×</TechSkillRemove>
+                          </TechSkillNameContainer>
+                          <TechSkillLevel
+                            value={skill.level}
+                            onChange={(e) => setSkillLevel(skill.name, e.target.value)}
+                          >
+                            <option value="">숙련도</option>
+                            {SKILL_LEVELS.map(level => (
+                              <option key={level} value={level}>{level}</option>
+                            ))}
+                          </TechSkillLevel>
+                        </TechSkillInfo>
+                      </TechSkillItem>
+                    ))}
+                  </TechSkillsList>
+                </SelectedTechContainer>
               )}
-            </SkillCard>
+            </TechStackCard>
 
             {/* 검색 결과 팝업 */}
             {skillSearchOpen && (
-              <SkillSearchPopup>
-                <SkillSearchPopupContent>
-                  <SkillSearchPopupHeader>
-                    <h3>{activeSearchCategory} 검색 결과</h3>
-                    <CloseButton onClick={() => setSkillSearchOpen(false)}>×</CloseButton>
-                  </SkillSearchPopupHeader>
-                  
-                  {skillSearchResults.length > 0 ? (
-                    <SkillSearchPopupBody>
-                      {skillSearchResults.map(skill => (
-                        <SkillSearchPopupItem
-                          key={skill.id}
-                          onClick={() => handleSkillSelect(skill)}
-                          selected={selectedSkills.some(s => s.name === skill.name)}
+              <TechSearchModal>
+                <TechModalContent>
+                  <TechModalHeader>
+                    <TechModalTitle>
+                      기술 스택
+                    </TechModalTitle>
+                    <TechModalHeaderRight>
+                      <TechModalSearchInput
+                        type="text"
+                        placeholder="기술명으로 검색..."
+                        value={skillSearchTerm}
+                        onChange={handleSkillSearch}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <TechModalClose onClick={() => setSkillSearchOpen(false)}>×</TechModalClose>
+                    </TechModalHeaderRight>
+                  </TechModalHeader>
+
+                  {/* 팝업 내 카테고리 필터 버튼들 */}
+                  {activeSearchCategory === "전체" && (
+                    <TechModalFilters>
+                      <TechModalFilterButton
+                        type="button"
+                        active={modalFilterCategory === "전체"}
+                        onClick={() => setModalFilterCategory("전체")}
+                      >
+                        전체
+                      </TechModalFilterButton>
+                      {Object.keys(groupedSkills).map(category => (
+                        <TechModalFilterButton
+                          key={category}
+                          type="button"
+                          active={modalFilterCategory === category}
+                          onClick={() => setModalFilterCategory(category)}
                         >
-                          <span className="skill-name">{skill.name}</span>
-                          {selectedSkills.some(s => s.name === skill.name) && (
-                            <span className="selected-indicator">✓ 선택됨</span>
-                          )}
-                        </SkillSearchPopupItem>
+                          {category}
+                        </TechModalFilterButton>
                       ))}
-                    </SkillSearchPopupBody>
-                  ) : skillSearchTerm.length > 0 ? (
-                    <SkillSearchPopupBody>
-                      <NoResultsMessage>
-                        "{skillSearchTerm}"에 대한 검색 결과가 없습니다.
-                      </NoResultsMessage>
-                    </SkillSearchPopupBody>
-                  ) : null}
-                </SkillSearchPopupContent>
-              </SkillSearchPopup>
+                    </TechModalFilters>
+                  )}
+                  
+                  {modalFilteredSkills.length > 0 ? (
+                    <TechModalBody>
+                      <TechResultsGrid>
+                        {modalFilteredSkills.map(skill => (
+                          <TechCategoryItem
+                            key={skill.id}
+                            onClick={() => handleSkillSelect(skill)}
+                            selected={selectedSkills.some(s => s.name === skill.name)}
+                          >
+                            <TechResultName>{skill.name}</TechResultName>
+                            {modalFilterCategory === "전체" && (
+                              <TechResultCategory>{skill.category}</TechResultCategory>
+                            )}
+                            {selectedSkills.some(s => s.name === skill.name) && (
+                              <TechResultSelected>✓ 선택됨</TechResultSelected>
+                            )}
+                          </TechCategoryItem>
+                        ))}
+                      </TechResultsGrid>
+                    </TechModalBody>
+                  ) : (
+                    <TechModalBody>
+                      <TechNoResults>
+                        {skillSearchTerm.trim() 
+                          ? `"${skillSearchTerm}"에 대한 검색 결과가 없습니다.`
+                          : `${modalFilterCategory === "전체" ? "표시할" : modalFilterCategory} 기술이 없습니다.`
+                        }
+                      </TechNoResults>
+                    </TechModalBody>
+                  )}
+                </TechModalContent>
+              </TechSearchModal>
             )}
           </Section>
           <SubmitBtn type="submit">저장</SubmitBtn>
@@ -473,7 +700,34 @@ export const MainBox = styled.div`background:#fff;border-radius:1.8rem;padding-b
 export const Header = styled.div`padding:1.7rem 2.5rem 0.6rem;text-align:center;h1{color:#ffa500;font-size:2.2rem;font-weight:700;}`;
 export const Divider = styled.hr`border:none;border-top:2px solid #e0e0e0;margin:1.2rem auto 2.2rem;width:87%;`;
 export const Section = styled.section`margin-bottom:2rem;padding:0 1rem;`;
-export const SectionTitle = styled.h3`font-size:1.1rem;font-weight:700;color:#ffa500;margin-bottom:1.2rem;padding-left:1.2rem;`;
+export const SectionTitle = styled.h3`
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size:1.1rem;
+  font-weight:700;
+  color:#ffa500;
+  margin-bottom:1.2rem;
+  padding-left:1.2rem;
+`;
+
+export const RequiredBadge = styled.span`
+  padding: 0.2rem 0.5rem;
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+`;
+
+export const OptionalBadge = styled.span`
+  padding: 0.2rem 0.5rem;
+  background: #95a5a6;
+  color: #fff;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+`;
 export const Label = styled.label`min-width:6rem;font-size:1rem;color:#555;`;
 export const Select = styled.select`width:100%;padding:0.72rem 0.85rem;border:1px solid #ccc;border-radius:0.65rem;transition:border-color 0.25s;&:focus{border-color:#ffa500;outline:none;}`;
 export const Input = styled.input`width:100%;padding:0.72rem 0.85rem;border:1px solid #ccc;border-radius:0.65rem;transition:border-color 0.25s;&:focus{border-color:#ffa500;outline:none;}`;
@@ -775,4 +1029,1118 @@ const SkillSearchPopupItem = styled.div`
     color: #ffa500;
     font-weight: 600;
   }
+`;
+
+// 자격증/어학 관련 스타일드 컴포넌트
+const CertificateCard = styled.div`
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.8rem;
+  padding: 1rem;
+  margin-bottom: 0.8rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const CertificateTopRow = styled.div`
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  margin-bottom: 0.8rem;
+`;
+
+const CertificateSelect = styled.select`
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  background: #fff;
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    border-color: #ffa500;
+    outline: none;
+  }
+`;
+
+const CertificateRemoveBtn = styled.button`
+  ${baseBtn}
+  background: #f5f5f5;
+  color: #999;
+  padding: 0.5rem;
+  border-radius: 0.4rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #e53935;
+    color: #fff;
+  }
+`;
+
+const CertificateInputRow = styled.div`
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-end;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+`;
+
+const CertificateInputWrapper = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+`;
+
+const CertificateInputLabel = styled.label`
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+`;
+
+const CertificateInput = styled.input`
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    border-color: #ffa500;
+    outline: none;
+  }
+  
+  &::placeholder {
+    color: #aaa;
+  }
+`;
+
+const DateInputWrapper = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 120px;
+`;
+
+const DateInputLabel = styled.label`
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+`;
+
+const CertificateDateInput = styled.input`
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    border-color: #ffa500;
+    outline: none;
+  }
+`;
+
+const CertificateAddBtn = styled.button`
+  ${baseBtn}
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: #f8f9fa;
+  color: #ffa500;
+  border: 1px dashed #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 0.3rem;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #ffa500;
+    color: #fff;
+    border-color: #ffa500;
+  }
+  
+  span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+`;
+
+// 자격증 입력 컨테이너와 플러스 버튼
+const CertificateInputContainer = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
+const CertificatePlusButton = styled.button`
+  ${baseBtn}
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ffa500;
+  color: #fff;
+  padding: 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 2;
+  
+  &:hover {
+    background: #e09400;
+    transform: translateY(-50%) scale(1.05);
+  }
+`;
+
+// 최종학력 관련 스타일드 컴포넌트
+const EducationCard = styled.div`
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.8rem;
+  padding: 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const EducationRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+`;
+
+const EducationFieldWrapper = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+`;
+
+const EducationLabel = styled.label`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.2rem;
+`;
+
+const EducationSelect = styled.select`
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  background: #fff;
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    border-color: #ffa500;
+    outline: none;
+  }
+  
+  &:disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+  }
+`;
+
+const EducationInput = styled.input`
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    border-color: #ffa500;
+    outline: none;
+  }
+  
+  &:disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+  }
+  
+  &::placeholder {
+    color: #aaa;
+  }
+`;
+
+// 경험 추가 버튼 (자격증/어학 추가 버튼과 동일한 스타일)
+const ExperienceAddBtn = styled.button`
+  ${baseBtn}
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: #f8f9fa;
+  color: #ffa500;
+  border: 1px dashed #ddd;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 0.3rem;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #ffa500;
+    color: #fff;
+    border-color: #ffa500;
+  }
+  
+  span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+`;
+
+// 관심 직무 애니메이션
+const jobItemFadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+// 관심 직무 관련 스타일드 컴포넌트
+const JobCard = styled.div`
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.8rem;
+  padding: 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const JobDropdownHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #f0f0f0;
+    border-color: #d0d0d0;
+  }
+`;
+
+const JobHeaderText = styled.span`
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+`;
+
+const JobDropdownIcon = styled.div`
+  transition: transform 0.3s ease;
+  transform: ${({open}) => open ? "rotate(180deg)" : "rotate(0deg)"};
+  color: #666;
+  font-size: 0.9rem;
+`;
+
+const JobDropdownBody = styled.div`
+  margin-top: 0.8rem;
+  padding: ${({open}) => open ? "0.8rem" : "0 0.8rem"};
+  background: #f9f9f9;
+  border-radius: 0.6rem;
+  border: 1px solid #e8e8e8;
+  max-height: ${({open}) => open ? "400px" : "0px"};
+  opacity: ${({open}) => open ? 1 : 0};
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+  transform: ${({open}) => open ? "translateY(0)" : "translateY(-10px)"};
+`;
+
+const JobGridContainer = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+  max-height: 300px;
+  overflow-y: auto;
+  opacity: ${({open}) => open ? 1 : 0};
+  transform: ${({open}) => open ? "translateY(0)" : "translateY(-5px)"};
+  transition: all 0.4s ease-in-out;
+  transition-delay: ${({open}) => open ? "0.1s" : "0s"};
+`;
+
+const JobItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: ${({selected}) => selected ? "#fff7ed" : "#fff"};
+  border: 1px solid ${({selected}) => selected ? "#ffa500" : "#e0e0e0"};
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: ${({open}) => open ? 1 : 0};
+  transform: ${({open}) => open ? "translateY(0)" : "translateY(10px)"};
+  animation: ${({open}) => open ? jobItemFadeInUp : "none"} 0.4s ease-out forwards;
+  animation-delay: ${({animationDelay, open}) => open ? `${animationDelay}s` : "0s"};
+  
+  &:hover {
+    background: ${({selected}) => selected ? "#ffead4" : "#f5f5f5"};
+    transform: ${({open}) => open ? "translateY(-1px)" : "translateY(10px)"};
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const JobCheckbox = styled.div`
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid ${({checked}) => checked ? "#ffa500" : "#ccc"};
+  background-color: ${({checked}) => checked ? "#ffa500" : "transparent"};
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  
+  ${({checked}) => checked && `
+    &::after {
+      content: '✓';
+      position: absolute;
+      top: -2px;
+      left: 1px;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+    }
+  `}
+`;
+
+const JobItemText = styled.span`
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+`;
+
+const SelectedJobsContainer = styled.div`
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: #f8f9fa;
+  border-radius: 0.6rem;
+  border: 1px solid #e8e8e8;
+`;
+
+const SelectedJobsTitle = styled.div`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.6rem;
+`;
+
+const JobTagContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const JobTag = styled.div`
+  background: #ffa500;
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #e09400;
+    transform: scale(0.95);
+  }
+`;
+
+// 기술 스택 관련 스타일드 컴포넌트
+const TechStackCard = styled.div`
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.8rem;
+  padding: 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const TechCategoryContainer = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+`;
+
+const TechGuideContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px dashed #d0d0d0;
+  border-radius: 0.6rem;
+  margin-bottom: 1.2rem;
+`;
+
+const TechGuideIcon = styled.span`
+  font-size: 1rem;
+`;
+
+const TechGuideText = styled.p`
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+`;
+
+const TechCategoryTab = styled.button`
+  ${baseBtn}
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  background: ${({ active }) => active ? "#ffb366" : "#f8f9fa"};
+  color: ${({ active }) => active ? "#fff" : "#666"};
+  border: 1px solid ${({ active }) => active ? "#ffb366" : "#e0e0e0"};
+  border-radius: 1.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${({ active }) => active ? "#ff9e47" : "#f0f0f0"};
+    border-color: ${({ active }) => active ? "#ff9e47" : "#d0d0d0"};
+  }
+`;
+
+const TechSearchSection = styled.div`
+  position: relative;
+  margin-bottom: 1.2rem;
+`;
+
+const TechSearchInputContainer = styled.div`
+  display: flex;
+  align-items: center;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.6rem;
+  padding: 0.3rem;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  
+  &:focus-within {
+    border-color: #ffa500;
+    box-shadow: 0 0 0 3px rgba(255, 165, 0, 0.1);
+  }
+`;
+
+const TechSearchIcon = styled.div`
+  margin-left: 0.5rem;
+  color: #999;
+  font-size: 0.9rem;
+`;
+
+const TechSearchInput = styled.input`
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.9rem;
+  color: #333;
+  
+  &:focus {
+    outline: none;
+  }
+  
+  &::placeholder {
+    color: #aaa;
+  }
+`;
+
+const TechSearchButton = styled.button`
+  ${baseBtn}
+  padding: 0.6rem 1rem;
+  background: #ffa500;
+  color: #fff;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  
+  &:hover:not(:disabled) {
+    background: #e09400;
+  }
+  
+  &:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+`;
+
+const TechAutoComplete = styled.div`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.6rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 10;
+  margin-top: 0.3rem;
+  max-height: 200px;
+  overflow-y: auto;
+`;
+
+const TechAutoCompleteItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  background-color: ${({ selected }) => selected ? "#fff7ed" : "transparent"};
+  border-bottom: 1px solid #f0f0f0;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+`;
+
+const TechItemName = styled.span`
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+`;
+
+const TechSelectedBadge = styled.span`
+  background: #ffa500;
+  color: #fff;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+`;
+
+const SelectedTechContainer = styled.div`
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 0.6rem;
+  padding: 1rem;
+`;
+
+const SelectedTechHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+`;
+
+const SelectedTechTitle = styled.h4`
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+`;
+
+const SelectedTechCount = styled.span`
+  background: #ffb366;
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
+const TechSkillsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+`;
+
+const TechSkillItem = styled.div`
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.5rem;
+  padding: 0.8rem;
+`;
+
+const TechSkillInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+`;
+
+const TechSkillNameContainer = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.8rem;
+  background: #ffb366;
+  color: #fff;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #ff9e47;
+  }
+`;
+
+const TechSkillNameText = styled.span`
+  flex: 1;
+  text-align: center;
+`;
+
+const TechSkillRemove = styled.button`
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  margin-left: 0.5rem;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+  }
+`;
+
+const TechSkillLevel = styled.select`
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #ddd;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #333;
+  
+  &:focus {
+    border-color: #ffb366;
+    outline: none;
+  }
+`;
+
+// 모달 관련 스타일
+const TechSearchModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const TechModalContent = styled.div`
+  background: #fff;
+  border-radius: 0.8rem;
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+`;
+
+const TechModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.5rem;
+  background: #ffb366;
+  color: #fff;
+`;
+
+const TechModalHeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const TechModalSearchInput = styled.input`
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #333;
+  min-width: 200px;
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  }
+  
+  &::placeholder {
+    color: #999;
+  }
+`;
+
+const TechModalTitle = styled.h3`
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+`;
+
+const TechModalClose = styled.button`
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const TechModalBody = styled.div`
+  padding: 1.2rem;
+  height: 420px;
+  overflow-y: auto;
+`;
+
+// 팝업 내 필터 버튼 관련 스타일
+const TechModalFilters = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.2rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+`;
+
+const TechModalFilterButton = styled.button`
+  ${baseBtn}
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  background: ${({ active }) => active ? '#ffb366' : '#f8f9fa'};
+  color: ${({ active }) => active ? '#fff' : '#666'};
+  border: 1px solid ${({ active }) => active ? '#ffb366' : '#e0e0e0'};
+  border-radius: 1.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${({ active }) => active ? '#ffb366' : '#f0f0f0'};
+    border-color: #ffb366;
+    color: ${({ active }) => active ? '#fff' : '#333'};
+  }
+`;
+
+const TechResultsGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+`;
+
+const TechResultItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid ${({ selected }) => selected ? "#ffa500" : "#e0e0e0"};
+  background-color: ${({ selected }) => selected ? "#fff7ed" : "#fff"};
+  
+  &:hover {
+    background-color: #f5f5f5;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const TechResultName = styled.span`
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  text-align: center;
+`;
+
+const TechResultCategory = styled.span`
+  font-size: 0.65rem;
+  color: #666;
+  background: #f0f0f0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  font-weight: 400;
+`;
+
+const TechResultSelected = styled.span`
+  font-size: 0.7rem;
+  color: #ffb366;
+  font-weight: 500;
+`;
+
+const TechNoResults = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #999;
+  font-size: 0.9rem;
+`;
+
+// 색상 제거 - 모든 요소에 기본 색상 사용
+
+// 전체 카테고리 구분 관련 스타일
+const TechCategorySection = styled.div`
+  margin-bottom: 2rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const TechCategorySectionTitle = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+`;
+
+const TechCategoryCount = styled.span`
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+`;
+
+const TechCategoryGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.6rem;
+`;
+
+const TechCategoryItem = styled.div`
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid ${({ selected }) => selected ? '#ffb366' : '#e0e0e0'};
+  background-color: ${({ selected }) => selected ? '#fff9f2' : '#fff'};
+  white-space: nowrap;
+  
+  &:hover {
+    background-color: ${({ selected }) => selected ? '#fff4e8' : '#f5f5f5'};
+    border-color: #ffb366;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+// 자격증 모달 관련 스타일
+const CertSearchModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const CertModalContent = styled.div`
+  background: #fff;
+  border-radius: 0.8rem;
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+`;
+
+const CertModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.5rem;
+  background: #ffb366;
+  color: #fff;
+`;
+
+const CertModalHeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const CertModalSearchInput = styled.input`
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #333;
+  min-width: 200px;
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  }
+  
+  &::placeholder {
+    color: #999;
+  }
+`;
+
+const CertModalTitle = styled.h3`
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+`;
+
+const CertModalClose = styled.button`
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const CertModalBody = styled.div`
+  padding: 1.2rem;
+  height: 520px;
+  overflow-y: auto;
+`;
+
+const CertResultsGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+`;
+
+const CertCategoryItem = styled.div`
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #e0e0e0;
+  background-color: #fff;
+  white-space: nowrap;
+  
+  &:hover {
+    background-color: #f5f5f5;
+    border-color: #ffb366;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+`;
+
+const CertResultName = styled.span`
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  text-align: center;
+`;
+
+const CertNoResults = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #999;
+  font-size: 0.9rem;
 `;

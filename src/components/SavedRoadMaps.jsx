@@ -6,7 +6,7 @@ import axios from 'axios';
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
 // ✨ 1. [수정] props로 setSavedRoadmaps 대신 savedRoadmaps를 받습니다.
-export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail, savedRoadmaps, title = "찜한 로드맵" }) {
+export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail, savedRoadmaps, title = "찜한 로드맵", onUnsaveRoadmap }) {
   // ✨ 2. [삭제] 컴포넌트 내부의 모든 상태와 데이터 fetching 로직을 삭제합니다.
   // const [savedRoadmaps, setSavedRoadmaps] = useState([]);
   // const [loading, setLoading] = useState(true);
@@ -37,8 +37,11 @@ export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail, saved
         headers: { Authorization: `Bearer ${token}` }
       });
       alert("찜이 해제되었습니다.");
-      // ✨ 3. [수정] 상태를 직접 변경하는 대신, MainContent에 변경 신호를 보냅니다.
-      window.dispatchEvent(new CustomEvent('roadmapBookmarkChanged'));
+      // ✨ 3. [수정] 공고와 동일한 방식으로 직접 콜백 호출하여 즉시 상태 업데이트
+      if (onUnsaveRoadmap) {
+        console.log("✅ 직접 콜백 호출로 찜 해제 즉시 상태 업데이트:", roadmapIdToDelete);
+        onUnsaveRoadmap(roadmapIdToDelete);
+      }
     } catch (error) {
       console.error("찜 해제 실패:", error);
       alert("찜 해제에 실패했습니다.");

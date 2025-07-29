@@ -5,7 +5,7 @@ import axios from "axios";
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
 
-export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSelectedPage }) {
+export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSelectedPage, onSaveRoadmap, onUnsaveRoadmap }) {
   const [roadmaps, setRoadmaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bookmarkedRoadmaps, setBookmarkedRoadmaps] = useState([]);
@@ -97,6 +97,12 @@ export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSe
         await axios.delete(`${BASE_URL}/user_roadmaps/${roadmapId}`, { headers });
         setBookmarkedRoadmaps(prev => prev.filter(item => item.id !== roadmapId));
         alert("찜이 해제되었습니다.");
+        
+        // ✨ [추가] 공고와 동일한 방식으로 직접 콜백 호출
+        if (onUnsaveRoadmap) {
+          console.log("✅ RoadmapListPage에서 찜 해제 콜백 호출:", roadmapId);
+          onUnsaveRoadmap(roadmapId);
+        }
       } else {
         // 찜하기
         const response = await axios.post(`${BASE_URL}/user_roadmaps/`, { 
@@ -106,6 +112,17 @@ export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSe
         const roadmap = roadmaps.find(item => item.id === roadmapId);
         if (roadmap) {
           setBookmarkedRoadmaps(prev => [...prev, roadmap]);
+          
+          // ✨ [추가] 공고와 동일한 방식으로 직접 콜백 호출
+          if (onSaveRoadmap) {
+            const newSavedRoadmap = {
+              id: response.data.id,
+              roadmaps_id: roadmapId,
+              roadmap: roadmap
+            };
+            console.log("✅ RoadmapListPage에서 찜하기 콜백 호출:", newSavedRoadmap);
+            onSaveRoadmap(newSavedRoadmap);
+          }
         }
         alert("찜이 추가되었습니다!");
       }
@@ -210,23 +227,18 @@ export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSe
     return 0; // 기본 정렬 유지
   });
 
+  // 페이지 마운트 시 스크롤을 최상단으로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     fetchRoadmaps();
     fetchBookmarkedRoadmaps();
   }, [type]);
 
-  // 찜 상태 변경 이벤트 리스너
-  useEffect(() => {
-    const handleRoadmapBookmarkChange = async () => {
-      await fetchBookmarkedRoadmaps();
-    };
-
-    window.addEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-    return () => {
-      window.removeEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-    };
-  }, []);
+  // ✨ [제거] 이벤트 기반 시스템 제거 - 이제 직접 콜백 방식 사용
 
   const isBookmarked = (roadmapId) => {
     return bookmarkedRoadmaps.some(item => item.id === roadmapId);

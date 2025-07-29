@@ -5,7 +5,7 @@ import RoadmapCategory from './RoadmapCategory';
 import RoadmapList from './RoadmapList';
 import CareerRoadmapDetail from './CareerRoadmapDetail';
 
-export default function CareerPlanFlow({ darkMode, userId, initialCategory = null }) {
+export default function CareerPlanFlow({ darkMode, userId, initialCategory = null, onSaveRoadmap, onUnsaveRoadmap }) {
   // 초기 상태 설정은 그대로 둡니다.
   const [view, setView] = useState(initialCategory ? 'list' : 'category');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
@@ -51,6 +51,8 @@ export default function CareerPlanFlow({ darkMode, userId, initialCategory = nul
           onBack={handleBack}
           darkMode={darkMode}
           userId={userId}
+          onSaveRoadmap={onSaveRoadmap}
+          onUnsaveRoadmap={onUnsaveRoadmap}
         />
       );
     case 'detail':

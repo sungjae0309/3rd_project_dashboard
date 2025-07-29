@@ -123,7 +123,7 @@ export default function GapAnalysisSection({ selectedJob, darkMode }) {
   if (loading) {
     return (
       <GapContainer $darkMode={darkMode}>
-        <LoadingText>분석 중...</LoadingText>
+        <LoadingText $darkMode={darkMode}>분석 중...</LoadingText>
       </GapContainer>
     );
   }
@@ -131,14 +131,14 @@ export default function GapAnalysisSection({ selectedJob, darkMode }) {
   if (error) {
     return (
       <GapContainer $darkMode={darkMode}>
-        <ErrorText>{error}</ErrorText>
+        <ErrorText $darkMode={darkMode}>{error}</ErrorText>
       </GapContainer>
     );
   }
 
   return (
     <GapContainer $darkMode={darkMode}>
-      <GapTitle>Top5 부족 역량</GapTitle>
+      <GapTitle $darkMode={darkMode}>Top5 부족 역량</GapTitle>
       <GapList>
         {gapData.map((item, index) => (
           <GapItem key={index} $darkMode={darkMode}>
@@ -154,69 +154,66 @@ export default function GapAnalysisSection({ selectedJob, darkMode }) {
 const GapContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
   height: 100%;
-  justify-content: center;
-  align-items: center;
   flex: 1;
-  padding: 0.5rem;
+  padding: 0.7rem 3.3rem 0.4rem 3.3rem;
+  background: ${({ $darkMode }) => $darkMode ? '#2d3748' : '#ffffff'};
+  border-radius: 8px;
+  border: 1px solid ${({ $darkMode }) => $darkMode ? '#4a5568' : '#e2e8f0'};
+  justify-content: flex-start;
 `;
 
 const GapTitle = styled.h4`
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: ${({ $darkMode }) => $darkMode ? '#fff' : 'rgb(27, 26, 25)'};
-  margin-top: -1rem;
-  margin-left: 2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: ${({ $darkMode }) => $darkMode ? '#ffffff' : '#2d3748'};
+  margin: 0 0 0.8rem 0;
   text-align: center;
-  padding: 0.4rem 0.8rem;
-  background: ${({ $darkMode }) => ($darkMode ? 'rgba(255, 193, 7, 0.15)' : 'rgba(243, 217, 141, 0.15)')};
-  border-radius: 0.4rem;
-  border: 1px solid ${({ $darkMode }) => ($darkMode ? 'rgba(255, 193, 7, 0.25)' : 'rgba(248, 217, 126, 0.25)')};
 `;
 
 const GapList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
   flex: 1;
-  align-items: center;
-  margin-left: 2.2rem;
+  overflow: hidden;
 `;
 
 const GapItem = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.7rem;
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
-  justify-content: center;
-  width: 100%;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid ${({ $darkMode }) => $darkMode ? 'rgba(255, 255, 255, 0.1)' : '#f0f0f0'};
+  transition: opacity 0.2s ease;
+  
+  &:last-child {
+    border-bottom: none;
+  }
   
   &:hover {
-    transform: translateY(-1px);
+    opacity: 0.7;
   }
 `;
 
-const GapRank = styled.div`  width: 1.2rem;
+const GapRank = styled.div`
+  width: 1.2rem;
   height: 1.2rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffc107, #ff8c00);
-  color: #333;
+  background: ${({ $darkMode }) => $darkMode ? '#718096' : '#a0aec0'};
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
 `;
 
 const GapSkill = styled.div`
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: ${({ $darkMode }) => $darkMode ? '#e2e8f0' : '#2d3748'};
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -224,21 +221,15 @@ const GapSkill = styled.div`
 `;
 
 const LoadingText = styled.div`
-  font-size: 0.75rem;
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  font-size: 0.9rem;
+  color: ${({ $darkMode }) => $darkMode ? '#a0aec0' : '#718096'};
   text-align: center;
-  padding: 0.8rem;
-  background: ${({ $darkMode }) => ($darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.9)')};
-  border-radius: 0.4rem;
-  border: 1px solid ${({ $darkMode }) => ($darkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)')};
+  padding: 1rem 1.5rem;
 `;
 
 const ErrorText = styled.div`
-  font-size: 0.75rem;
-  color: #e74c3c;
+  font-size: 0.9rem;
+  color: #e53e3e;
   text-align: center;
-  padding: 0.8rem;
-  background: ${({ $darkMode }) => ($darkMode ? 'rgba(231, 76, 60, 0.1)' : 'rgba(231, 76, 60, 0.05)')};
-  border-radius: 0.4rem;
-  border: 1px solid ${({ $darkMode }) => ($darkMode ? 'rgba(231, 76, 60, 0.2)' : 'rgba(231, 76, 60, 0.1)')};
+  padding: 1rem 1.5rem;
 `;

@@ -454,10 +454,10 @@ console.log(' [AiRecsPreviewCard] 상태 확인:', {
                         </>
                     ) : (
                         <>
-                            <ColumnTitle style={{ flex: 4, textAlign: "left", paddingLeft: "0.5rem" }}>공고명</ColumnTitle>
-                            <ColumnTitle style={{ flex: 3, textAlign: "left", paddingLeft: "3.0rem" }}>회사명</ColumnTitle>
-                            <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "2.5rem" }}>적합도</ColumnTitle>
-                            <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "0.9rem" }}>추천 이유</ColumnTitle>
+                    <ColumnTitle style={{ flex: 4, textAlign: "left", paddingLeft: "0.5rem" }}>공고명</ColumnTitle>
+                    <ColumnTitle style={{ flex: 3, textAlign: "left", paddingLeft: "3.0rem" }}>회사명</ColumnTitle>
+                    <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "2.5rem" }}>적합도</ColumnTitle>
+                    <ColumnTitle style={{ flex: 2, textAlign: "center", paddingRight: "0.9rem" }}>추천 이유</ColumnTitle>
                         </>
                     )}
                 </ColumnHeader>
@@ -501,25 +501,25 @@ console.log(' [AiRecsPreviewCard] 상태 확인:', {
                                         </>
                                     ) : (
                                         <>
-                                            <JobTitlePreview
-                                                $darkMode={darkMode}
-                                                title={job.title || job.job_title || ''}
-                                                onClick={() => handleTitleClick(job.id)}
-                                            >
-                                                <strong>{job.title || job.job_title || '제목 없음'}</strong>
-                                                {(category === 'ai') || (category === 'similarity' && job.isAiRecommended) ? (
-                                                    <SimpleAiTag>AI</SimpleAiTag>
-                                                ) : null}
-                                            </JobTitlePreview>
-                                            <CompanyNameDisplay company={job.company || job.company_name} darkMode={darkMode} />
-                                            <MatchPercent $match={(job.similarity || job.match_score || 0) * 100}>
-                                                {job.similarity || job.match_score ? ((job.similarity || job.match_score) * 100).toFixed(1) + '%' : ''}
-                                            </MatchPercent>
-                                            <ReasonButtonWrapper>
-                                                {onShowReason && (
-                                                    <ReasonButton onClick={() => onShowReason(job)} $darkMode={darkMode}>알아보기</ReasonButton>
-                                                )}
-                                            </ReasonButtonWrapper>
+                                    <JobTitlePreview
+                                        $darkMode={darkMode}
+                                        title={job.title || job.job_title || ''}
+                                        onClick={() => handleTitleClick(job.id)}
+                                    >
+                                        <strong>{job.title || job.job_title || '제목 없음'}</strong>
+                                        {(category === 'ai') || (category === 'similarity' && job.isAiRecommended) ? (
+                                            <SimpleAiTag>AI</SimpleAiTag>
+                                        ) : null}
+                                    </JobTitlePreview>
+                                    <CompanyNameDisplay company={job.company || job.company_name} darkMode={darkMode} />
+                                    <MatchPercent $match={(job.similarity || job.match_score || 0) * 100}>
+                                        {job.similarity || job.match_score ? ((job.similarity || job.match_score) * 100).toFixed(1) + '%' : ''}
+                                    </MatchPercent>
+                                    <ReasonButtonWrapper>
+                                        {onShowReason && (
+                                            <ReasonButton onClick={() => onShowReason(job)} $darkMode={darkMode}>알아보기</ReasonButton>
+                                        )}
+                                    </ReasonButtonWrapper>
                                         </>
                                     )}
                                 </PreviewItem>
@@ -703,7 +703,7 @@ const ColumnTitle = styled.div`
 const PreviewList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1rem;
   flex: 1;
   height: 270px; /* 페이징 공간 확보 */
   overflow-y: ${({ $enableScroll }) => $enableScroll ? 'auto' : 'hidden'}; /* 추천 공고 탭에서는 스크롤 비활성화 */

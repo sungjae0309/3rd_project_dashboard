@@ -26,7 +26,9 @@ import {
   FaChartArea,
   FaDiversity,
   FaHistory,
-  FaExternalLinkAlt
+  FaExternalLinkAlt,
+  FaHeart,
+  FaRegHeart
 } from "react-icons/fa";
 import axios from "axios";
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
@@ -1835,9 +1837,12 @@ const getUniqueSkillsCount = () => {
                         }}
                         $isSaved={savedRoadmapIds.has(item.id)}
                       >
-                        {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
+                        {savedRoadmapIds.has(item.id) ? (
+                          <FaHeart color="red" />
+                        ) : (
+                          <FaRegHeart />
+                        )}
                       </OvercomeSaveButton>
-                      <OvercomeItemArrow>→</OvercomeItemArrow>
                     </OvercomeItemActions>
                   </OvercomeItem>
                 ))
@@ -1883,9 +1888,12 @@ const getUniqueSkillsCount = () => {
                         }}
                         $isSaved={savedRoadmapIds.has(item.id)}
                       >
-                        {savedRoadmapIds.has(item.id) ? '❤️' : '🤍'}
+                        {savedRoadmapIds.has(item.id) ? (
+                          <FaHeart color="red" />
+                        ) : (
+                          <FaRegHeart />
+                        )}
                       </OvercomeSaveButton>
-                      <OvercomeItemArrow>→</OvercomeItemArrow>
                     </OvercomeItemActions>
                   </OvercomeItem>
                 ))
@@ -2196,6 +2204,23 @@ const getUniqueSkillsCount = () => {
                   </OvercomeDetailSkills>
                 </OvercomeDetailInfo>
               )}
+              
+              {/* 찜하기 버튼 추가 */}
+              <OvercomeDetailActions>
+                <OvercomeDetailSaveButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleSave(selectedOvercomeItem.id);
+                  }}
+                  $isSaved={savedRoadmapIds.has(selectedOvercomeItem.id)}
+                >
+                  {savedRoadmapIds.has(selectedOvercomeItem.id) ? (
+                    <FaHeart color="red" />
+                  ) : (
+                    <FaRegHeart />
+                  )}
+                </OvercomeDetailSaveButton>
+              </OvercomeDetailActions>
             </OvercomeDetailBody>
           </OvercomeDetailContent>
         </OvercomeDetailPopup>
@@ -2455,10 +2480,33 @@ const OvercomeSaveButton = styled.button`
   }
 `;
 
-const OvercomeItemArrow = styled.div`
-  font-size: 1.2rem;
-  color: ${({ $darkMode }) => $darkMode ? "#777" : "#ccc"};
-  font-weight: bold;
+const OvercomeDetailActions = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid ${({ $darkMode }) => $darkMode ? '#444' : '#e0e0e0'};
+`;
+
+const OvercomeDetailSaveButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background: ${({ $darkMode }) => $darkMode ? '#444' : '#f0f0f0'};
+    transform: scale(1.1);
+  }
+  
+  svg {
+    font-size: 1.5rem;
+  }
 `;
 
 const OvercomeViewAllButton = styled.button`

@@ -37,15 +37,15 @@ export default function PromptBar({ darkMode, activePage, onSubmit }) {
 
 const Wrapper = styled.div`
   position: fixed;
-  bottom: 2.5rem;
-  left: 60%;
+  bottom: 1rem;
+  left: 59.5%;
   transform: translateX(-50%);
   z-index: 20;
   width: 100%;
-  max-width: 800px;
+  max-width: 850px;
   display: flex;
   justify-content: center;
-  height: 80px;
+  height: 100px;
 `;
 
 const Prompt = styled.div`
@@ -53,9 +53,9 @@ const Prompt = styled.div`
   align-items: center;
   gap: 1rem;
   width: 100%;
-  max-width: 800px;
+  max-width: 900px;
   border-radius: 1rem;
-  padding: 1rem;
+  padding: 1.2rem;
   ${({ $darkMode }) =>
     $darkMode ? "background:#333;" : "background:rgb(188, 185, 179);"}
 `;

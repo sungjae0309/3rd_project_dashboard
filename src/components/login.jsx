@@ -27,6 +27,7 @@ export default function Login() {
       callbackUrl: `${window.location.origin}/navercallback`,
       isPopup: false,
       loginButton: { color: "green", type: 3, height: 48 },
+      callbackHandle: true, // 콜백 처리를 위한 설정 추가
     }).init();
   };
 

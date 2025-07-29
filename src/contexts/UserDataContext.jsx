@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
 
 const UserDataContext = createContext();
 
@@ -29,11 +29,14 @@ export const UserDataProvider = ({ children }) => {
   const fetchUserData = useCallback(async (force = false) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
+      console.log('⚠️ [UserDataContext] 토큰 없음, 사용자 데이터를 null로 설정');
       setUserData(null);
+      setLoading(false);
       return;
     }
 
     if (!force && userData && isCacheValid('user')) {
+      console.log('📋 [UserDataContext] 캐시된 사용자 데이터 사용');
       return;
     }
 
@@ -49,15 +52,20 @@ export const UserDataProvider = ({ children }) => {
       setError(null);
     } catch (err) {
       console.error("❌ [UserDataContext] 사용자 데이터 조회 실패:", err);
+      console.error("❌ [UserDataContext] 에러 상세:", err.response?.status, err.response?.data);
       setError(err.message);
-      // 401 (Unauthorized) 오류 발생 시 사용자 데이터 초기화
+      // 401 (Unauthorized) 오류 발생 시 토큰 제거 및 사용자 데이터 초기화
       if (err.response && err.response.status === 401) {
+        console.log('🚫 [UserDataContext] 인증 실패, 토큰 제거');
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("userId");
         setUserData(null);
       }
     } finally {
+      console.log('🔄 [UserDataContext] 로딩 상태 해제');
       setLoading(false);
     }
-  }, [userData]); // 2. useCallback 의존성 배열 수정
+  }, []); // useCallback 의존성 배열에서 userData 제거하여 무한 루프 방지
 
   const fetchDesiredJob = useCallback(async (force = false) => {
     if (!force && desiredJob && isCacheValid('desiredJob')) {
@@ -72,7 +80,7 @@ export const UserDataProvider = ({ children }) => {
       console.error("희망 직무 조회 실패:", err);
       setError(err.message);
     }
-  }, [desiredJob]); // 2. useCallback 의존성 배열 수정
+  }, []); // useCallback 의존성 배열에서 desiredJob 제거하여 무한 루프 방지
 
   // 3. 초기 데이터 로드를 간결하게 수정
   useEffect(() => {

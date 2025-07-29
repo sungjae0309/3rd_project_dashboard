@@ -34,11 +34,39 @@ export const AuthProvider = ({ children }) => {
     checkLoginStatus();
   }, []);
 
-  const login = (token, userId) => {
+  const login = async (token, userId) => {
     localStorage.setItem("accessToken", token);
-    localStorage.setItem("userId", userId);
+    
+    // userId가 없으면 API에서 사용자 정보를 가져옴
+    if (!userId) {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000'}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          userId = userData.id;
+          localStorage.setItem("userId", userId);
+          setUser({ id: userId, token, ...userData });
+        } else {
+          // API 호출 실패 시 기본값 사용
+          localStorage.setItem("userId", "unknown");
+          setUser({ id: "unknown", token });
+        }
+      } catch (error) {
+        console.error("사용자 정보 가져오기 실패:", error);
+        localStorage.setItem("userId", "unknown");
+        setUser({ id: "unknown", token });
+      }
+    } else {
+      localStorage.setItem("userId", userId);
+      setUser({ id: userId, token });
+    }
+    
     setIsLoggedIn(true);
-    setUser({ id: userId, token });
   };
 
  // AuthContext.jsx

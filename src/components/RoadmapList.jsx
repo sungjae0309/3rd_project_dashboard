@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
 
-export default function RoadmapList({ category, onSelectRoadmap, onBack, darkMode }) {
+export default function RoadmapList({ category, onSelectRoadmap, onBack, darkMode, onSaveRoadmap, onUnsaveRoadmap }) {
   const [roadmaps, setRoadmaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -79,33 +79,7 @@ export default function RoadmapList({ category, onSelectRoadmap, onBack, darkMod
     getData();
   }, [category]);
 
-  // ✨ [추가] 전역 이벤트 리스너 추가 (다른 컴포넌트에서 찜하기/찜취소 시 새로고침)
-  useEffect(() => {
-    const handleRoadmapBookmarkChange = async () => {
-      console.log('🔄 로드맵 목록 찜 상태 변경 이벤트 발생');
-      const token = localStorage.getItem("accessToken");
-      if (!token) return;
-
-      try {
-        // 찜한 로드맵 ID 목록을 다시 불러와서 상태 업데이트
-        const savedRes = await axios.get(`${BASE_URL}/user_roadmaps/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (Array.isArray(savedRes.data)) {
-          setSavedRoadmapIds(new Set(savedRes.data.map(item => item.roadmaps_id)));
-        }
-      } catch (err) {
-        console.warn("찜한 로드맵 목록 새로고침 실패:", err);
-      }
-    };
-
-    // 커스텀 이벤트 리스너 추가
-    window.addEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-
-    return () => {
-      window.removeEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-    };
-  }, []);
+  // ✨ [제거] 이벤트 기반 시스템 제거 - 이제 직접 콜백 방식 사용
 
   // 필터링 및 정렬된 로드맵 목록
   const filteredAndSortedRoadmaps = roadmaps
@@ -166,8 +140,18 @@ export default function RoadmapList({ category, onSelectRoadmap, onBack, darkMod
         // ✨ 4. 찜하기 성공 후, 화면에 바로 반영합니다.
         setSavedRoadmapIds(prev => new Set(prev).add(roadmapId));
         
-        // ✨ [수정] 찜 상태 변경을 전파하는 전역 이벤트를 발생시킵니다.
-        window.dispatchEvent(new CustomEvent('roadmapBookmarkChanged'));
+        // ✨ [수정] 공고와 동일한 방식으로 직접 콜백 호출하여 즉시 상태 업데이트
+        const newSavedRoadmap = {
+          id: response.data.id,
+          roadmaps_id: roadmapId,
+          roadmap: roadmaps.find(r => r.id === roadmapId)
+        };
+        
+        // 직접 콜백 호출 (공고와 동일한 방식)
+        if (onSaveRoadmap) {
+          console.log("✅ 직접 콜백 호출로 즉시 상태 업데이트:", newSavedRoadmap);
+          onSaveRoadmap(newSavedRoadmap);
+        }
       }
     } catch (err) {
       console.error("❌ 찜하기 API 호출 실패:", err); 

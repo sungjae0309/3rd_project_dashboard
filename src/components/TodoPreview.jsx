@@ -1,9 +1,9 @@
 // src/components/TodoPreview.jsx
 
-import React, { useState, useEffect, useCallback } from 'react';
-import styled, { css } from 'styled-components';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import styled, { css, keyframes } from 'styled-components';
 import axios from 'axios';
-import { FaClipboardCheck, FaPlus, FaCalendarAlt } from 'react-icons/fa';
+import { FaClipboardCheck, FaPlus, FaCalendarAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { useJobNames } from '../contexts/JobNamesContext'; // 직무 목록 Context
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
@@ -15,13 +15,16 @@ function TodoPreview({ darkMode, setSelectedPage }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // 날짜 선택 상태 추가
+  const [isTransitioning, setIsTransitioning] = useState(false); // 전환 애니메이션 상태 추가
+  const [showCalendar, setShowCalendar] = useState(false); // 캘린더 표시 상태
+  const dateInputRef = useRef(null); // 날짜 input 참조
 
   const { jobNames } = useJobNames();
   const jobNamesList = jobNames.map(job => job.name);
   const [jobInput, setJobInput] = useState("");
   const [daysInput, setDaysInput] = useState("15");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const checkSchedule = useCallback(async () => {
       const token = localStorage.getItem("accessToken");
@@ -54,12 +57,67 @@ function TodoPreview({ darkMode, setSelectedPage }) {
           setError("정보를 불러오는 데 실패했습니다.");
       } finally {
           setLoading(false);
+          setIsTransitioning(false); // 전환 완료
       }
   }, [selectedDate]); // selectedDate를 의존성에 추가
 
   useEffect(() => {
       checkSchedule();
   }, [checkSchedule]);
+
+  // 캘린더 자동 열기
+  useEffect(() => {
+      if (showCalendar && dateInputRef.current) {
+          const timer = setTimeout(() => {
+              try {
+                  if (dateInputRef.current.showPicker) {
+                      dateInputRef.current.showPicker();
+                  } else {
+                      dateInputRef.current.click();
+                  }
+              } catch (error) {
+                  // 일부 브라우저에서 showPicker가 지원되지 않을 수 있음
+                  dateInputRef.current.click();
+              }
+          }, 50);
+
+          // 5초 후에 자동으로 캘린더 상태 닫기 (취소 시 대비)
+          const autoCloseTimer = setTimeout(() => {
+              setShowCalendar(false);
+          }, 5000);
+
+          return () => {
+              clearTimeout(timer);
+              clearTimeout(autoCloseTimer);
+          };
+      }
+  }, [showCalendar]);
+
+  // 날짜 이동 핸들러
+  const moveDate = (direction) => {
+      const currentDate = new Date(selectedDate);
+      const newDate = new Date(currentDate);
+      newDate.setDate(currentDate.getDate() + direction);
+      
+      setIsTransitioning(true);
+      setSelectedDate(newDate.toISOString().split('T')[0]);
+  };
+
+  // 날짜 변경 핸들러 추가
+  const handleDateChange = (e) => {
+      setIsTransitioning(true); // 전환 시작
+      setSelectedDate(e.target.value);
+      setShowCalendar(false); // 캘린더 숨기기
+  };
+
+  // 날짜 포맷팅 함수
+  const formatDisplayDate = (dateString) => {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}.${month}.${day}`;
+  };
 
 
   const handleGenerate = async () => {
@@ -94,51 +152,32 @@ function TodoPreview({ darkMode, setSelectedPage }) {
 };
 
     const handleToggle = async (task) => {
-        // ... (이전 코드와 동일)
-    };
-    
-    const handleDeleteAll = async (e) => {
-        e.stopPropagation();
-        if (!window.confirm("모든 일정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-            return;
-        }
-        
         const token = localStorage.getItem("accessToken");
-        if (!token) {
-            alert("로그인이 필요합니다.");
-            return;
-        }
+        if (!token) return;
         
-        setIsDeleting(true);
+        // 낙관적 업데이트: UI를 먼저 업데이트
+        const updatedTasks = todayTasks.map(t => 
+            t.id === task.id ? { ...t, is_completed: !t.is_completed } : t
+        );
+        setTodayTasks(updatedTasks);
+        
+        // 통계 즉시 업데이트
+        const completedCount = updatedTasks.filter(t => t.is_completed).length;
+        setStats({
+            total: updatedTasks.length,
+            completed: completedCount,
+            pending: updatedTasks.length - completedCount
+        });
+        
         try {
-            console.log("삭제 API 호출 시작:", `${BASE_URL}/todo-list/clear`);
-            const response = await axios.delete(`${BASE_URL}/todo-list/clear`, {
+            await axios.patch(`${BASE_URL}/todo-list/${task.id}/toggle`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            
-            console.log("삭제 API 응답:", response);
-            
-            // 삭제 후 상태 초기화
-            setHasSchedule(false);
-            setTodayTasks([]);
-            setStats({ total: 0, completed: 0, pending: 0 });
-            alert("모든 일정이 삭제되었습니다.");
         } catch (err) {
-            console.error("일정 삭제 실패:", err);
-            console.error("에러 응답:", err.response);
-            
-            let errorMessage = "일정 삭제에 실패했습니다.";
-            if (err.response?.status === 401) {
-                errorMessage = "로그인이 필요합니다.";
-            } else if (err.response?.status === 404) {
-                errorMessage = "삭제할 일정이 없습니다.";
-            } else if (err.response?.data?.detail) {
-                errorMessage = err.response.data.detail;
-            }
-            
-            alert(errorMessage);
-        } finally {
-            setIsDeleting(false);
+            console.error("일정 상태 변경 실패:", err);
+            // 실패 시 이전 상태로 롤백
+            await checkSchedule();
+            alert("일정 상태 변경에 실패했습니다.");
         }
     };
     
@@ -151,72 +190,108 @@ function TodoPreview({ darkMode, setSelectedPage }) {
         <HoverCard $darkMode={darkMode} onClick={() => setSelectedPage("todo")}>
             
             <SectionTitle>
-                <HighlightBar />
-                <span>To-do List</span>
+                <div>
+                    <HighlightBar />
+                    <span>To-do List</span>
+                </div>
             </SectionTitle>
 
             {hasSchedule ? (
                 <>
                     {/* <IntroText $darkMode={darkMode}>학습 계획을 확인하고 관리하세요</IntroText> */}
                     
-                    {/* 간결한 날짜 선택기 */}
-                    <DateSelector $darkMode={darkMode}>
-                        <FaCalendarAlt />
-                        <DateInput
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
+                    {/* 개선된 날짜 선택기 */}
+                    <DateNavigator $darkMode={darkMode}>
+                        <DateNavButton 
+                            onClick={(e) => { e.stopPropagation(); moveDate(-1); }}
                             $darkMode={darkMode}
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </DateSelector>
+                        >
+                            <FaChevronLeft />
+                        </DateNavButton>
+                        
+                        <DateDisplay 
+                            onClick={(e) => { e.stopPropagation(); setShowCalendar(true); }}
+                            $darkMode={darkMode}
+                        >
+                            {formatDisplayDate(selectedDate)}
+                        </DateDisplay>
+                        
+                        <DateNavButton 
+                            onClick={(e) => { e.stopPropagation(); moveDate(1); }}
+                            $darkMode={darkMode}
+                        >
+                            <FaChevronRight />
+                        </DateNavButton>
+                        
+                        {showCalendar && (
+                            <HiddenDateInput
+                                ref={dateInputRef}
+                                type="date"
+                                value={selectedDate}
+                                onChange={handleDateChange}
+                                $darkMode={darkMode}
+                            />
+                        )}
+                    </DateNavigator>
                     
-                    <StatsRow>
-                        <StatBox><StatValue color="#3498db">{stats.total}</StatValue><StatLabel>할 일</StatLabel></StatBox>
-                        <StatBox><StatValue color="#2ecc71">{stats.completed}</StatValue><StatLabel>완료</StatLabel></StatBox>
-                        <StatBox><StatValue color="#f39c12">{stats.pending}</StatValue><StatLabel>진행중</StatLabel></StatBox>
-                    </StatsRow>
-                    <TaskList>
-                        {todayTasks.length === 0 && <EmptyMessage>선택한 날짜에는 할 일이 없습니다.</EmptyMessage>}
-                        {todayTasks.map(task => (
-                            <TaskItem key={task.id} $isCompleted={task.is_completed} onClick={(e) => { e.stopPropagation(); handleToggle(task); }}>
-                                <Checkbox $isCompleted={task.is_completed} />
-                                <TaskTitle>{task.title}</TaskTitle>
-                            </TaskItem>
-                        ))}
-                    </TaskList>
-                    <ButtonRow>
-                        <DeleteButton onClick={handleDeleteAll} disabled={isDeleting} $darkMode={darkMode}>
-                            {isDeleting ? "삭제 중..." : "일정 삭제"}
-                        </DeleteButton>
-                        <ViewAllButton onClick={(e) => { e.stopPropagation(); setSelectedPage("todo"); }}>전체 일정 →</ViewAllButton>
-                    </ButtonRow>
+                    <AnimatedContainer $isTransitioning={isTransitioning || loading}>
+                        <StatsRow>
+                            <StatBox><StatValue color="#3498db">{stats.total}</StatValue><StatLabel>할 일</StatLabel></StatBox>
+                            <StatBox><StatValue color="#2ecc71">{stats.completed}</StatValue><StatLabel>완료</StatLabel></StatBox>
+                            <StatBox><StatValue color="#f39c12">{stats.pending}</StatValue><StatLabel>진행중</StatLabel></StatBox>
+                        </StatsRow>
+                        <TaskList>
+                            {todayTasks.length === 0 && <EmptyMessage>선택한 날짜에는 할 일이 없습니다.</EmptyMessage>}
+                            {todayTasks.map((task, index) => (
+                                <TaskItem 
+                                    key={task.id} 
+                                    $isCompleted={task.is_completed} 
+                                    $animationDelay={index * 0.1}
+                                    $darkMode={darkMode}
+                                    onClick={(e) => { e.stopPropagation(); handleToggle(task); }}
+                                    title={task.is_completed ? "완료된 작업 - 클릭하여 미완료로 변경" : "미완료 작업 - 클릭하여 완료로 변경"}
+                                >
+                                    <Checkbox 
+                                        $isCompleted={task.is_completed} 
+                                        onClick={(e) => { e.stopPropagation(); handleToggle(task); }}
+                                    />
+                                    <TaskTitle $isCompleted={task.is_completed}>{task.title}</TaskTitle>
+                                </TaskItem>
+                            ))}
+                        </TaskList>
+                    </AnimatedContainer>
+                    <ViewAllButton onClick={(e) => { e.stopPropagation(); setSelectedPage("todo"); }}>전체 일정 →</ViewAllButton>
                 </>
             ) : (
                 <>
-                    <IntroText $darkMode={darkMode}>찜한 공고/로드맵 기반으로 맞춤 일정을 생성해보세요.</IntroText>
                     {!isGenerating ? (
-                        <InputForm onClick={(e) => e.stopPropagation()}>
-                            <InputRow>
-                                <InputLabel>목표 직무</InputLabel>
-                                <select value={jobInput} onChange={e => setJobInput(e.target.value)}>
-                                    <option value="">직무 선택</option>
-                                    {jobNamesList.map(job => <option key={job} value={job}>{job}</option>)}
-                                </select>
-                            </InputRow>
-                            <InputRow>
-                                <InputLabel>학습 기간</InputLabel>
-                                <input type="number" value={daysInput} onChange={e => setDaysInput(e.target.value)} placeholder="15" />
-                                <span>일</span>
-                            </InputRow>
-                            <GenerateButton onClick={handleGenerate} disabled={isGenerating}>
-                                AI 일정 생성하기
-                            </GenerateButton>
-                        </InputForm>
+                        <>
+                            <IntroText $darkMode={darkMode}>찜한 공고/로드맵 기반으로 맞춤 일정을 생성해보세요.</IntroText>
+                            <InputForm onClick={(e) => e.stopPropagation()}>
+                                <InputRow>
+                                    <InputLabel>목표 직무</InputLabel>
+                                    <select value={jobInput} onChange={e => setJobInput(e.target.value)}>
+                                        <option value="">직무 선택</option>
+                                        {jobNamesList.map(job => <option key={job} value={job}>{job}</option>)}
+                                    </select>
+                                </InputRow>
+                                <InputRow>
+                                    <InputLabel>학습 기간</InputLabel>
+                                    <InputWithUnit>
+                                        <input type="number" value={daysInput} onChange={e => setDaysInput(e.target.value)} placeholder="15" />
+                                        <UnitText>일</UnitText>
+                                    </InputWithUnit>
+                                </InputRow>
+                                <GenerateButton onClick={handleGenerate} disabled={isGenerating}>
+                                        AI 일정 생성하기
+                                </GenerateButton>
+                            </InputForm>
+                        </>
                     ) : (
                         <LoadingContainer>
                             <LoadingSpinner />
-                            <LoadingText $darkMode={darkMode}>로딩 중입니다. 잠시만 기다려 주세요.</LoadingText>
+                            <LoadingText $darkMode={darkMode}>로딩 중...</LoadingText>
+                            <LoadingSubText $darkMode={darkMode}>맞춤형 일정을 생성하고 있어요</LoadingSubText>
                         </LoadingContainer>
                     )}
                 </>
@@ -227,6 +302,37 @@ function TodoPreview({ darkMode, setSelectedPage }) {
 
 // export default를 React.memo로 감싸줍니다.
 export default React.memo(TodoPreview);
+
+// 애니메이션 keyframes 추가
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const fadeOut = keyframes`
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.3;
+  }
+`;
+
+// 새로운 애니메이션 컨테이너 컴포넌트 추가
+const AnimatedContainer = styled.div`
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  opacity: ${({ $isTransitioning }) => $isTransitioning ? 0.3 : 1};
+  transform: ${({ $isTransitioning }) => $isTransitioning ? 'translateY(5px)' : 'translateY(0)'};
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+`;
 
 // Styled Components
 // src/components/TodoPreview.jsx 의 styled-components 영역
@@ -266,10 +372,18 @@ const CardIconBg = styled.div`
 const SectionTitle = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
   font-size: 1.7rem;
   font-weight: 800;
   margin-bottom: 0.5rem;
+  
+  > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1;
+  }
 `;
 
 const HighlightBar = styled.div`
@@ -280,10 +394,12 @@ const HighlightBar = styled.div`
 `;
 
 const IntroText = styled.p`
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.6;
-  color: #6c5f3f;
+  color: #495057;
   margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 500;
   ${({ $darkMode }) => $darkMode && css`color: #ccc;`}
 `;
 
@@ -305,12 +421,14 @@ const StatValue = styled.div`
     font-size: 1.8rem;
     font-weight: 700;
     color: ${props => props.color};
+    transition: all 0.3s ease;
 `;
 
 const StatLabel = styled.div`
     font-size: 0.8rem;
     color: #888;
     margin-top: 0.2rem;
+    transition: all 0.3s ease;
 `;
 
 const TaskList = styled.div`
@@ -327,14 +445,31 @@ const TaskItem = styled.div`
     align-items: center;
     gap: 0.8rem;
     padding: 0.8rem;
-    background: ${({ $isCompleted, $darkMode }) => $isCompleted ? 'rgba(0,0,0,0.05)' : ($darkMode ? '#3a3a3a' : '#fff')};
+    background: ${({ $isCompleted, $darkMode }) => $isCompleted ? 'rgba(46, 204, 113, 0.1)' : ($darkMode ? '#3a3a3a' : '#fff')};
+    border: 1px solid ${({ $isCompleted }) => $isCompleted ? 'rgba(46, 204, 113, 0.3)' : 'transparent'};
     border-radius: 0.8rem;
     cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: ${({ $isCompleted }) => $isCompleted ? 'line-through' : 'none'};
+    transition: all 0.3s ease;
     color: ${({ $isCompleted }) => $isCompleted ? '#888' : 'inherit'};
+    opacity: 0;
+    transform: translateY(10px);
+    animation: ${fadeInUp} 0.5s ease forwards;
+    animation-delay: ${({ $animationDelay }) => $animationDelay}s;
+    user-select: none;
 
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${({ $isCompleted, $darkMode }) => 
+            $isCompleted 
+                ? 'rgba(46, 204, 113, 0.15)' 
+                : ($darkMode ? '#444' : '#f8f9fa')};
+    }
     
+    &:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
 `;
 
 const Checkbox = styled.div`
@@ -343,61 +478,128 @@ const Checkbox = styled.div`
     border-radius: 50%;
     border: 2px solid ${({ $isCompleted }) => $isCompleted ? '#2ecc71' : '#ccc'};
     background-color: ${({ $isCompleted }) => $isCompleted ? '#2ecc71' : 'transparent'};
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    &:hover {
+        border-color: #2ecc71;
+        transform: scale(1.1);
+    }
+    
+    &::after {
+        content: '✓';
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        opacity: ${({ $isCompleted }) => $isCompleted ? 1 : 0};
+        transition: opacity 0.2s ease;
+    }
 `;
 
 const TaskTitle = styled.span`
     font-weight: 600;
+    transition: all 0.3s ease;
+    flex: 1;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    text-decoration: ${({ $isCompleted }) => $isCompleted ? 'line-through' : 'none'};
 `;
 
 const EmptyMessage = styled.p`
     text-align: center;
     color: #888;
     margin-top: 2rem;
+    opacity: 0;
+    animation: ${fadeInUp} 0.5s ease forwards;
+    animation-delay: 0.2s;
 `;
 
-const DateSelector = styled.div`
+const DateNavigator = styled.div`
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
     margin-bottom: 1rem;
     padding: 0.6rem 0.8rem;
-    background: ${({ $darkMode }) => $darkMode ? '#3a3a3a' : '#fff'};
+    background: transparent;
     border-radius: 0.6rem;
-    border: 1px solid ${({ $darkMode }) => $darkMode ? '#555' : '#e0e0e0'};
-    color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
-    font-size: 0.9rem;
+    border: none;
+    transition: all 0.3s ease;
+
+    &:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 `;
 
-const DateInput = styled.input`
-    flex: 1;
-    padding: 0.3rem 0.5rem;
-    border: none;
+const DateNavButton = styled.button`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     background: transparent;
+    border: none;
+    border-radius: 0.4rem;
+    color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+    
+    &:hover {
+        background: #ffc107;
+        color: #fff;
+        transform: scale(1.05);
+    }
+    
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const DateDisplay = styled.div`
+    flex: 1;
+    text-align: center;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    border-radius: 0.4rem;
     color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
     font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
     
-    &:focus {
-        outline: none;
+    &:hover {
+        background: ${({ $darkMode }) => $darkMode ? '#555' : '#e9ecef'};
+        transform: translateY(-1px);
     }
     
-    &::-webkit-calendar-picker-indicator {
-        filter: ${({ $darkMode }) => $darkMode ? 'invert(1)' : 'none'};
-        cursor: pointer;
+    &:active {
+        transform: translateY(0);
     }
 `;
 
-const ButtonRow = styled.div`
-    display: flex;
-    gap: 0.8rem;
-    margin-top: auto;
-    flex-shrink: 0;
+const HiddenDateInput = styled.input`
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    z-index: -1;
 `;
 
 const ViewAllButton = styled.button`
-    flex: 1;
+    width: 100%;
     padding: 0.8rem;
     background: #ffc107;
     border: none;
@@ -405,31 +607,10 @@ const ViewAllButton = styled.button`
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    margin-top: auto;
 
     &:hover {
         background: #ffb300;
-    }
-`;
-
-const DeleteButton = styled.button`
-    flex: 1;
-    padding: 0.8rem;
-    background: ${({ $darkMode }) => $darkMode ? '#dc3545' : '#dc3545'};
-    color: white;
-    border: none;
-    border-radius: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-    font-size: 0.9rem;
-
-    &:hover:not(:disabled) {
-        background: #c82333;
-    }
-    
-    &:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
     }
 `;
 
@@ -438,42 +619,96 @@ const InputForm = styled.div`
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.8rem;
-    padding: 0.5rem;
+    gap: 1.2rem;
+    padding: 1.5rem;
     min-height: 200px;
+    border-radius: 0.8rem;
 `;
 
 const InputRow = styled.div`
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.6rem;
+    
     select, input {
-        flex: 1;
-        padding: 0.4rem;
-        border-radius: 0.4rem;
-        border: 1px solid #ddd;
-        font-size: 0.85rem;
+        width: 100%;
+        padding: 0.8rem 1rem;
+        border-radius: 0.6rem;
+        border: 1px solid #dee2e6;
+        font-size: 0.95rem;
+        background: white;
+        transition: all 0.2s ease;
+        
+        &:focus {
+            outline: none;
+            border-color: #ffc107;
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        }
+        
+        &:hover {
+            border-color: #adb5bd;
+        }
+    }
+    
+    span {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-left: 0.5rem;
     }
 `;
 
 const InputLabel = styled.label`
     font-weight: 600;
-    width: 50px;
-    font-size: 0.85rem;
+    font-size: 1rem;
+    color: #495057;
+    margin-bottom: 0.3rem;
+`;
+
+const InputWithUnit = styled.div`
+    display: flex;
+    align-items: center;
+    position: relative;
+    
+    input {
+        padding-right: 2.5rem !important;
+    }
+`;
+
+const UnitText = styled.span`
+    position: absolute;
+    right: 1rem;
+    font-size: 0.95rem;
+    color: #6c757d;
+    font-weight: 500;
+    pointer-events: none;
 `;
 
 const GenerateButton = styled.button`
     width: 100%;
-    padding: 0.6rem;
+    padding: 1rem;
     background: #ffc107;
     border: none;
-    border-radius: 0.6rem;
+    border-radius: 0.8rem;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 1rem;
     cursor: pointer;
-    margin-top: 0.8rem;
-    &:hover { background: #ffb300; }
-    &:disabled { background: #ccc; }
+    margin-top: 1rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+    
+    &:hover { 
+        background: #ffb300; 
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+    }
+    
+    &:disabled { 
+        background: #e9ecef; 
+        color: #6c757d;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
 `;
 
 const LoadingSpinner = styled.div`
@@ -496,12 +731,22 @@ const LoadingContainer = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 1rem;
     padding: 2rem;
+    padding-top: 4rem;
+    min-height: 200px;
 `;
 
 const LoadingText = styled.p`
     font-size: 0.9rem;
     color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+    margin-bottom: 0.5rem;
+`;
+
+const LoadingSubText = styled.p`
+    font-size: 0.85rem;
+    color: ${({ $darkMode }) => $darkMode ? '#aaa' : '#888'};
+    margin-top: 0;
+    margin-bottom: 0;
 `;

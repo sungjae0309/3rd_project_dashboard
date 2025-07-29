@@ -18,7 +18,7 @@ import {
   FaLaptopCode,
   FaChalkboardTeacher
 } from "react-icons/fa";
-import { FiSearch, FiBookmark } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
 import TodoList from "./TodoList";
 import PromptBar from "./PromptBar";
 import ProfileMenu from "./ProfileMenu";
@@ -67,10 +67,20 @@ export default function MainContent({
   const [selectedJob, setSelectedJob] = useState("프론트엔드 개발자"); // 기본값으로 설정
   const [selectedFieldType, setSelectedFieldType] = useState("tech_stack");
   const [selectedReasonJob, setSelectedReasonJob] = useState(null);
+  const [chatRefreshTrigger, setChatRefreshTrigger] = useState(0); // 채팅 새로고침 트리거
+  const [chatLoading, setChatLoading] = useState(false); // 채팅 로딩 상태
 
   // Context에서 데이터 가져오기
   const { userData, desiredJob, fetchDesiredJob, loading } = useUserData();
   const { roadmapData, fetchRoadmapData } = useRoadmap();
+
+  // ✨ [추가] 극복 방안 미니카드용 로드맵 데이터 상태
+  const [overcomeRoadmapData, setOvercomeRoadmapData] = useState({
+    bootcamps: [],
+    courses: []
+  });
+  // ✨ [추가] 극복 방안 로딩 상태
+  const [overcomeLoading, setOvercomeLoading] = useState(true);
 
   // Gemini가 추가한 상태들
   const [initialRoadmapCategory, setInitialRoadmapCategory] = useState(null);
@@ -93,6 +103,29 @@ export default function MainContent({
   // useState의 초기값 함수를 사용하여 localStorage에서 userId를 가져옵니다.
   const [userId, setUserId] = useState(() => localStorage.getItem("userId"));
 
+  // ✨ [추가] 사용자 관심 직무를 가져와서 selectedJob 기본값으로 설정
+  useEffect(() => {
+    const fetchUserDesiredJob = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await axios.get(`${BASE_URL}/users/desired-job`, { headers });
+        const userDesiredJob = response.data;
+        
+        if (userDesiredJob) {
+          console.log('✅ [MainContent] 사용자 관심직무 설정:', userDesiredJob);
+          setSelectedJob(userDesiredJob);
+        }
+      } catch (error) {
+        console.warn('사용자 관심직무 가져오기 실패, 기본값 유지:', error);
+        // 에러 시 기본값 "프론트엔드 개발자" 유지
+      }
+    };
+
+    fetchUserDesiredJob();
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
+
   // ✨ 2. [추가] 찜한 로드맵 목록을 불러오는 함수를 정의합니다.
   const fetchSavedRoadmaps = async () => {
     if (!token) return;
@@ -111,24 +144,22 @@ export default function MainContent({
     }
   };
 
-  // ✨ 3. [추가] 컴포넌트가 처음 로드될 때, 그리고 찜 상태 변경 이벤트가 발생할 때마다 목록을 새로고침합니다.
+  // ✨ [추가] 공고와 동일한 방식의 직접 콜백 함수들 정의
+  const handleSaveRoadmap = (newSavedRoadmap) => {
+    console.log("📥 MainContent에서 로드맵 찜하기 콜백 받음:", newSavedRoadmap);
+    setSavedRoadmaps(prev => [...prev, newSavedRoadmap]);
+    console.log("✅ 로드맵 찜하기 즉시 반영 완료");
+  };
+
+  const handleUnsaveRoadmap = (roadmapId) => {
+    console.log("📥 MainContent에서 로드맵 찜 해제 콜백 받음:", roadmapId);
+    setSavedRoadmaps(prev => prev.filter(item => item.roadmaps_id !== roadmapId));
+    console.log("✅ 로드맵 찜 해제 즉시 반영 완료");
+  };
+
+  // ✨ 3. [추가] 컴포넌트가 처음 로드될 때 찜한 로드맵 목록을 불러옵니다.
   useEffect(() => {
-    fetchSavedRoadmaps(); // 초기 로딩
-
-    // 찜하기/찜취소 이벤트가 발생하면 목록을 다시 불러옴
-    const handleRoadmapBookmarkChange = () => {
-      console.log('🔄 MainContent에서 찜 상태 변경 이벤트 감지');
-      setTimeout(() => {
-        fetchSavedRoadmaps();
-      }, 100); // 약간의 지연을 두어 서버 상태 업데이트 대기
-    };
-
-    window.addEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-
-    // 컴포넌트가 사라질 때 이벤트 리스너를 정리합니다.
-    return () => {
-      window.removeEventListener('roadmapBookmarkChanged', handleRoadmapBookmarkChange);
-    };
+    fetchSavedRoadmaps(); // 초기 로딩만 수행
   }, [token]);
 
   // maincontent.jsx
@@ -248,33 +279,70 @@ useEffect(() => {
     const trimmed = text.trim();
     if (!trimmed) return;
   
+    // 사용자 메시지를 먼저 히스토리에 추가
     setChatHistory((prev) => [...prev, { sender: "user", text: trimmed }]);
-  
-    try {
-      // 1. 새 채팅 세션 생성
-      const sessionData = await createChatSession(token);
-      const newSessionId = sessionData.id;
-      
-      // 2. 첫 메시지 전송
-      const response = await sendChatMessage(newSessionId, trimmed, token);
-      
-      // 3. 채팅 페이지로 이동 (세션 ID와 함께)
-      setSelectedSession(newSessionId);
-      setSelectedPage("chat");
-      
-    } catch (err) {
-      console.error("채팅 세션 생성 실패:", err);
-      // 에러 처리 - 기존 방식으로 fallback
-      setChatHistory((prev) => [...prev, { sender: "user", text: trimmed }]);
+    
+    // 즉시 채팅 페이지로 이동 (사용자 경험 개선)
+    setSelectedPage("chat");
+    
+    // 로딩 상태 시작
+    setChatLoading(true);
+    
+    // 백그라운드에서 세션 생성 및 메시지 전송 처리
+    (async () => {
       try {
-        const res = await fetchMcpResponse(trimmed, userId, token);
-        const assistantMsg = res?.message || "⚠ 메시지 없음";
-        setChatHistory((prev) => [...prev, { sender: "assistant", text: assistantMsg }]);
-      } catch (fallbackErr) {
-        console.error("fallback 응답 오류:", fallbackErr);
-        setChatHistory((prev) => [...prev, { sender: "assistant", text: "⚠ 서버 오류" }]);
+        // 1. 새 채팅 세션 생성
+        const sessionData = await createChatSession(token);
+        const newSessionId = sessionData.id;
+        
+        // 2. 세션 ID 설정 (ChatPage가 이를 감지하여 히스토리 로드)
+        setSelectedSession(newSessionId);
+        
+        // 3. 첫 메시지 전송 
+        await sendChatMessage(newSessionId, trimmed, token);
+        
+        // 4. ChatPage에 히스토리 새로고침 신호
+        setChatRefreshTrigger(prev => prev + 1);
+        
+        // 5. 로딩 상태 종료
+        setChatLoading(false);
+        
+      } catch (err) {
+        console.error("채팅 세션 생성 실패:", err);
+        
+        try {
+          // fallback: 기존 MCP 방식 사용
+          const res = await fetchMcpResponse(trimmed, userId, token);
+          const assistantMsg = res?.message || "죄송합니다. 응답을 받지 못했습니다.";
+          setChatHistory((prev) => [...prev, { sender: "assistant", text: assistantMsg }]);
+          
+          // fallback 모드로 유지 (세션 ID는 null)
+          setSelectedSession(null);
+          
+          // fallback에서도 ChatPage에 업데이트 신호
+          setChatRefreshTrigger(prev => prev + 1);
+          
+          // fallback 로딩 상태 종료
+          setChatLoading(false);
+          
+        } catch (fallbackErr) {
+          console.error("fallback 응답 오류:", fallbackErr);
+          setChatHistory((prev) => [...prev, { 
+            sender: "assistant", 
+            text: "⚠️ 죄송합니다. 서버 연결에 문제가 발생했습니다. 잠시 후 다시 시도해주세요." 
+          }]);
+          
+          // 오류 상태로 유지
+          setSelectedSession(null);
+          
+          // 오류 상황에서도 ChatPage에 업데이트 신호
+          setChatRefreshTrigger(prev => prev + 1);
+          
+          // 오류 로딩 상태 종료
+          setChatLoading(false);
+        }
       }
-    }
+    })();
   };
   
   /* ───────── 랜딩 카드(홈) ───────── */
@@ -289,12 +357,17 @@ useEffect(() => {
       
       // Context를 사용하여 로드맵 데이터 가져오기 (강제 새로고침)
       fetchRoadmapData(newJob, true);
+      
+      // ✨ [추가] 극복 방안 미니카드용 데이터도 새로 가져오기
+      fetchOvercomeRoadmapData(newJob);
     };
 
     // 로드맵 데이터 fetch - Context 사용 (무한 루프 방지)
     useEffect(() => {
       if (selectedJob && !hasInitialized.current) {
         fetchRoadmapData(selectedJob);
+        // ✨ [추가] 극복 방안 미니카드용 데이터도 가져오기
+        fetchOvercomeRoadmapData(selectedJob);
         hasInitialized.current = true;
       }
     }, [selectedJob]); // selectedJob만 의존성으로 설정
@@ -306,31 +379,20 @@ useEffect(() => {
         return;
       }
 
-      const token = localStorage.getItem("accessToken");
+      // Context에서 desired job 정보 사용
+      const desiredJobData = desiredJob;
       
-      const fetchUserDesiredJob = async () => {
-        // API 문서에 따르면 인증이 필요하지 않으므로 모든 사용자가 사용 가능
-        try {
-          console.log(' [LandingCards] Context 사용');
-          
-          // Context에서 desired job 정보 사용
-          const desiredJobData = desiredJob;
-          
-          console.log(' [LandingCards] 사용자 관심직무:', desiredJobData);
-          
-          if (desiredJobData) {
-            setSelectedJob(desiredJobData);
-            // Context에서 자동으로 로드맵 데이터를 가져옴
-          }
-        } catch (error) {
-          console.error('사용자 관심직무 가져오기 실패:', error);
-          // 에러 시에도 기본값 유지
-        } finally {
-          hasInitialized.current = true;
-        }
-      };
-
-      fetchUserDesiredJob();
+      console.log(' [LandingCards] Context에서 사용자 관심직무:', desiredJobData);
+      
+      if (desiredJobData) {
+        setSelectedJob(desiredJobData);
+        // Context에서 자동으로 로드맵 데이터를 가져옴
+        
+        // ✨ [추가] 극복 방안 미니카드용 데이터도 가져오기
+        fetchOvercomeRoadmapData(desiredJobData);
+      }
+      
+      hasInitialized.current = true;
     }, [desiredJob]); // desiredJob이 변경될 때만 실행
 
     const handleViewAllClick = (type) => {
@@ -379,8 +441,8 @@ useEffect(() => {
             <CardRow style={{ marginTop: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
             {[
                 { id: "analysis", label: "트렌드 분석", desc: "", color: "rgb(250, 243, 221)", },
-                { id: "gap", label: "갭 분석", desc: "내 이력서와 공고를 비교합니다.", color: "rgb(251, 233, 179)", },
-                { id: "plan", label: "극복 방안", desc: "부족한 부분 학습 계획을 제안합니다.", color: "rgb(252, 224, 132)", },
+                { id: "gap", label: "갭 분석", desc: "", color: "rgb(251, 233, 179)", },
+                { id: "plan", label: "극복 방안", desc: "", color: "rgb(252, 224, 132)", },
             ].map((s) => (
                 s.id !== "plan" ? (
                   <MiniCard 
@@ -422,10 +484,7 @@ useEffect(() => {
                     )}
                     {s.id === "gap" && (
                       <>
-                        <GapCardHeader>
-                          <GapCardTitle>{s.label}</GapCardTitle>
-                          <GapCardSubtitle>내 이력서와 공고를 비교합니다</GapCardSubtitle>
-                        </GapCardHeader>
+                        <GapCardTitle style={{ marginBottom: '1rem', textAlign: 'center', width: '100%' }}>{s.label}</GapCardTitle>
                         <GapAnalysisSection 
                           selectedJob={selectedJob} 
                           darkMode={darkMode}
@@ -441,58 +500,49 @@ useEffect(() => {
                     onClick={() => handleViewAllClick("plan")}
                     style={{ minHeight: "370px", maxHeight: "370px", display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', padding: '1.3rem', overflow: 'hidden' }}
                   >
-                    <PlanCardHeader>
-                      <PlanCardTitle>{s.label}</PlanCardTitle>
-                      <PlanCardSubtitle>{s.desc}</PlanCardSubtitle>
-                    </PlanCardHeader>
+                    <PlanCardTitle style={{ marginBottom: '1.5rem', textAlign: 'center', width: '100%' }}>{s.label}</PlanCardTitle>
                     <PlanContent>
-                      {roadmapData.bootcamps.length > 0 && (
-                        <PlanItem>
-                          <PlanItemIcon>🎓</PlanItemIcon>
-                          <PlanItemContent>
-                            <PlanItemTitle>부트캠프</PlanItemTitle>
-                            <PlanItemName>{roadmapData.bootcamps[0].name}</PlanItemName>
-                            <PlanItemDuration>{roadmapData.bootcamps[0].duration}</PlanItemDuration>
-                          </PlanItemContent>
-                        </PlanItem>
-                      )}
-                      {roadmapData.bootcamps.length > 1 && (
-                        <PlanItem>
-                          <PlanItemIcon>🎓</PlanItemIcon>
-                          <PlanItemContent>
-                            <PlanItemTitle>부트캠프</PlanItemTitle>
-                            <PlanItemName>{roadmapData.bootcamps[1].name}</PlanItemName>
-                            <PlanItemDuration>{roadmapData.bootcamps[1].duration}</PlanItemDuration>
-                          </PlanItemContent>
-                        </PlanItem>
-                      )}
-                      {roadmapData.courses.length > 0 && (
-                        <PlanItem>
-                          <PlanItemIcon>📚</PlanItemIcon>
-                          <PlanItemContent>
-                            <PlanItemTitle>강의</PlanItemTitle>
-                            <PlanItemName>{roadmapData.courses[0].name}</PlanItemName>
-                            <PlanItemDuration>{roadmapData.courses[0].duration}</PlanItemDuration>
-                          </PlanItemContent>
-                        </PlanItem>
-                      )}
-                      {roadmapData.courses.length > 1 && (
-                        <PlanItem>
-                          <PlanItemIcon>📚</PlanItemIcon>
-                          <PlanItemContent>
-                            <PlanItemTitle>강의</PlanItemTitle>
-                            <PlanItemName>{roadmapData.courses[1].name}</PlanItemName>
-                            <PlanItemDuration>{roadmapData.courses[1].duration}</PlanItemDuration>
-                          </PlanItemContent>
-                        </PlanItem>
+                      {overcomeLoading ? (
+                        <LoadingContainer>
+                          <LoadingSpinner $darkMode={darkMode} />
+                          <LoadingText $darkMode={darkMode}>추천 로드맵을 불러오는 중...</LoadingText>
+                        </LoadingContainer>
+                      ) : (
+                        <>
+                          {overcomeRoadmapData.bootcamps.length > 0 && (
+                            <PlanItem>
+                              <PlanItemContent>
+                                <PlanItemHeader>
+                                  <PlanItemIcon>🎓</PlanItemIcon>
+                                  <PlanItemTitle>부트캠프</PlanItemTitle>
+                                </PlanItemHeader>
+                                <PlanItemName>{overcomeRoadmapData.bootcamps[0].name}</PlanItemName>
+                                <PlanItemDuration>
+                                  {overcomeRoadmapData.bootcamps[0].status} • {overcomeRoadmapData.bootcamps[0].onoff} • {overcomeRoadmapData.bootcamps[0].company}
+                                </PlanItemDuration>
+                              </PlanItemContent>
+                            </PlanItem>
+                          )}
+                          {overcomeRoadmapData.courses.length > 0 && (
+                            <PlanItem>
+                              <PlanItemContent>
+                                <PlanItemHeader>
+                                  <PlanItemIcon>📚</PlanItemIcon>
+                                  <PlanItemTitle>강의</PlanItemTitle>
+                                </PlanItemHeader>
+                                <PlanItemName>{overcomeRoadmapData.courses[0].name}</PlanItemName>
+                                <PlanItemDuration>{overcomeRoadmapData.courses[0].company}</PlanItemDuration>
+                              </PlanItemContent>
+                            </PlanItem>
+                          )}
+                          {overcomeRoadmapData.bootcamps.length === 0 && overcomeRoadmapData.courses.length === 0 && !overcomeLoading && (
+                            <EmptyState>
+                              <EmptyText $darkMode={darkMode}>추천 로드맵이 없습니다</EmptyText>
+                            </EmptyState>
+                          )}
+                        </>
                       )}
                     </PlanContent>
-                    <PlanViewAllButton onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewAllClick("plan");
-                    }}>
-                      전체 보기 →
-                    </PlanViewAllButton>
                   </MiniCard>
                 )
             ))}
@@ -523,15 +573,35 @@ useEffect(() => {
                 </SearchModule>
               </SearchModules>
             </MiniMapItem>
-            <MiniMapItem onClick={() => setSelectedPage("saved")} $darkMode={darkMode}>
+            <MiniMapItem $darkMode={darkMode}>
               <MiniMapTitle>
                 <MiniMapHighlightBar />
                 <span>찜한 페이지</span>
               </MiniMapTitle>
               <SearchModules>
-                <SearchModule>
-                  <SearchModuleIcon><FiBookmark /></SearchModuleIcon>
-                  <SearchModuleLabel>저장된 항목</SearchModuleLabel>
+                <SearchModule onClick={() => {
+                  setSelectedPage("saved");
+                  // URL 파라미터로 탭 정보 전달
+                  window.history.pushState({}, '', `${window.location.pathname}?tab=jobs`);
+                }}>
+                  <SearchModuleIcon><FaBriefcase /></SearchModuleIcon>
+                  <SearchModuleLabel>공고</SearchModuleLabel>
+                </SearchModule>
+                <SearchModule onClick={() => {
+                  setSelectedPage("saved");
+                  // URL 파라미터로 탭 정보 전달
+                  window.history.pushState({}, '', `${window.location.pathname}?tab=bootcamps`);
+                }}>
+                  <SearchModuleIcon><FaLaptopCode /></SearchModuleIcon>
+                  <SearchModuleLabel>부트캠프</SearchModuleLabel>
+                </SearchModule>
+                <SearchModule onClick={() => {
+                  setSelectedPage("saved");
+                  // URL 파라미터로 탭 정보 전달
+                  window.history.pushState({}, '', `${window.location.pathname}?tab=courses`);
+                }}>
+                  <SearchModuleIcon><FaChalkboardTeacher /></SearchModuleIcon>
+                  <SearchModuleLabel>강의</SearchModuleLabel>
                 </SearchModule>
               </SearchModules>
             </MiniMapItem>
@@ -706,6 +776,50 @@ useEffect(() => {
   // 추천 이유 모달 닫기
   const handleCloseReasonModal = () => setSelectedReasonJob(null);
 
+  // ✨ [추가] 극복 방안 미니카드용 로드맵 데이터 가져오기 함수
+  const fetchOvercomeRoadmapData = async (jobCategory) => {
+    if (!jobCategory) return;
+    
+    try {
+      setOvercomeLoading(true);
+      const token = localStorage.getItem("accessToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`${BASE_URL}/visualization/roadmap_recommendations`, {
+        params: {
+          category: jobCategory,
+          limit: 10,
+          force_refresh: false
+        },
+        headers
+      });
+      
+      console.log('극복 방안 로드맵 데이터 API 응답:', response.data);
+      
+      // 부트캠프와 강의를 각각 1개씩만 선택
+      const allBootcamps = response.data.filter(item => item.type === '부트캠프');
+      const allCourses = response.data.filter(item => item.type === '강의');
+      
+      const selectedBootcamp = allBootcamps.length > 0 ? [allBootcamps[0]] : [];
+      const selectedCourse = allCourses.length > 0 ? [allCourses[0]] : [];
+      
+      setOvercomeRoadmapData({
+        bootcamps: selectedBootcamp,
+        courses: selectedCourse
+      });
+      
+    } catch (error) {
+      console.error('극복 방안 로드맵 데이터 조회 실패:', error);
+      // 에러 시 빈 배열로 설정
+      setOvercomeRoadmapData({
+        bootcamps: [],
+        courses: []
+      });
+    } finally {
+      setOvercomeLoading(false);
+    }
+  };
+
   // 디버깅을 위한 로그 추가
   console.log('🔍 [MainContent] 사용자 데이터 상태:', { loading, userData, name: userData?.name });
 
@@ -732,6 +846,9 @@ useEffect(() => {
               userId={userId}
               onJobDetail={setJobDetailId}
               onRoadmapDetail={setRoadmapDetailId}
+              // ✨ [추가] 로드맵 찜하기/해제 콜백 전달
+              onSaveRoadmap={handleSaveRoadmap}
+              onUnsaveRoadmap={handleUnsaveRoadmap}
             />
           )}
           {selectedPage === "history" && (
@@ -745,7 +862,16 @@ useEffect(() => {
             />
           )}
           {selectedPage === "chat" && (
-            <ChatPage sessionId={selectedSession} token={token} darkMode={darkMode} onNewSession={(newId) => { setSelectedSession(newId); }} />
+            <ChatPage 
+              sessionId={selectedSession} 
+              token={token} 
+              darkMode={darkMode} 
+              onNewSession={(newId) => { setSelectedSession(newId); }}
+              fallbackChatHistory={chatHistory}
+              onChatHistoryUpdate={setChatHistory}
+              refreshTrigger={chatRefreshTrigger}
+              isLoading={chatLoading}
+            />
           )}
           {["dashboard", "search"].includes(selectedPage) && (
             <>
@@ -789,6 +915,8 @@ useEffect(() => {
               type="부트캠프"
               onRoadmapDetail={setRoadmapDetailId}
               setSelectedPage={setSelectedPage}
+              onSaveRoadmap={handleSaveRoadmap}
+              onUnsaveRoadmap={handleUnsaveRoadmap}
             />
           )}
           {selectedPage === "roadmap-courses" && (
@@ -797,6 +925,8 @@ useEffect(() => {
               type="강의"
               onRoadmapDetail={setRoadmapDetailId}
               setSelectedPage={setSelectedPage}
+              onSaveRoadmap={handleSaveRoadmap}
+              onUnsaveRoadmap={handleUnsaveRoadmap}
             />
           )}
 
@@ -1739,31 +1869,12 @@ const getDummyCourses = (job) => {
 };
 
 // 새로운 스타일 컴포넌트들 추가 (파일 하단의 스타일 컴포넌트 섹션에 추가)
-const GapCardHeader = styled.div`
-  text-align: center;
-  margin-bottom: 1rem;
-  width: 100%;
-`;
-
 const GapCardTitle = styled.h3`
   font-size: 1.2rem;
   font-weight: 700;
   color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
   margin: 0 0 0.3rem 0;
   text-align: center;
-`;
-
-const GapCardSubtitle = styled.p`
-  font-size: 0.8rem;
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
-  margin: 0;
-  opacity: 0.8;
-  text-align: center;
-`;
-
-const PlanCardHeader = styled.div`
-  text-align: center;
-  margin-bottom: 1.2rem;
 `;
 
 const PlanCardTitle = styled.h3`
@@ -1773,134 +1884,120 @@ const PlanCardTitle = styled.h3`
   margin: 0 0 0.3rem 0;
 `;
 
-const PlanCardSubtitle = styled.p`
-  font-size: 0.8rem;
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
-  margin: 0;
-  opacity: 0.8;
-`;
-
 const PlanContent = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  margin-bottom: 0.8rem;
+  gap: 0.8rem;
   flex: 1;
-  overflow: hidden; // 추가: 넘치는 내용 숨김
+  overflow: hidden;
+  justify-content: center;
+  padding: 1rem 0;
 `;
 
 const PlanItem = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.6rem; // 간격 줄임
-  padding: 0.6rem; // 패딩 줄임
+  padding: 1rem;
   background: ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 255, 255, 0.08)' 
-    : 'rgba(255, 255, 255, 0.85)'};
-  border-radius: 0.5rem; // 반지름 줄임
+    ? 'rgba(255, 255, 255, 0.05)' 
+    : 'rgba(255, 255, 255, 0.7)'};
+  border-radius: 8px;
   border: 1px solid ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 255, 255, 0.15)' 
-    : 'rgba(0, 0, 0, 0.08)'};
+    ? 'rgba(255, 255, 255, 0.1)' 
+    : 'rgba(0, 0, 0, 0.05)'};
   transition: all 0.2s ease;
-  box-shadow: ${({ $darkMode }) => $darkMode 
-    ? '0 1px 4px rgba(0, 0, 0, 0.2)' 
-    : '0 1px 4px rgba(0, 0, 0, 0.05)'};
-  min-height: 0; // 추가: 최소 높이 제거
   
   &:hover {
     background: ${({ $darkMode }) => $darkMode 
-      ? 'rgba(255, 255, 255, 0.12)' 
-      : 'rgba(255, 255, 255, 0.95)'};
-    transform: translateY(-1px); // 이동 거리 줄임
-    box-shadow: ${({ $darkMode }) => $darkMode 
-      ? '0 2px 6px rgba(0, 0, 0, 0.3)' 
-      : '0 2px 6px rgba(0, 0, 0, 0.1)'};
+      ? 'rgba(255, 255, 255, 0.1)' 
+      : 'rgba(255, 255, 255, 0.9)'};
+    transform: translateY(-1px);
   }
-`;
-
-const PlanItemIcon = styled.div`
-  font-size: 1rem; // 크기 줄임
-  flex-shrink: 0;
-  width: 1.6rem; // 크기 줄임
-  height: 1.6rem; // 크기 줄임
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 193, 7, 0.2)' 
-    : 'rgba(255, 193, 7, 0.15)'};
-  border-radius: 0.3rem; // 반지름 줄임
-  border: 1px solid ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 193, 7, 0.3)' 
-    : 'rgba(255, 193, 7, 0.25)'};
 `;
 
 const PlanItemContent = styled.div`
   flex: 1;
   min-width: 0;
-  overflow: hidden; // 추가: 텍스트 넘침 방지
+  overflow: hidden;
+`;
+
+const PlanItemHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+`;
+
+const PlanItemIcon = styled.div`
+  font-size: 1rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const PlanItemTitle = styled.div`
-  font-size: 0.65rem; // 크기 줄임
-  color: ${({ $darkMode }) => $darkMode ? '#aaa' : '#666'};
-  margin-bottom: 0.15rem; // 마진 줄임
+  font-size: 0.85rem;
+  color: ${({ $darkMode }) => $darkMode ? '#a0aec0' : '#718096'};
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.3px; // 자간 줄임
+  letter-spacing: 0.5px;
 `;
 
 const PlanItemName = styled.div`
-                        <PlanItem>
-                          <PlanItemIcon>🎓</PlanItemIcon>
-                          <PlanItemContent>
-                            <PlanItemTitle>부트캠프</PlanItemTitle>
-                            <PlanItemName>{roadmapData.bootcamps[1].name}</PlanItemName>
-                            <PlanItemDuration>{roadmapData.bootcamps[1].duration}</PlanItemDuration>
-  font-size: 0.75rem; // 크기 조정
+  font-size: 0.85rem;
   font-weight: 600;
-  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
-  margin-bottom: 0.15rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal; // nowrap에서 normal로 변경
-  line-height: 1.2;
-  max-width: 100%;
-  display: -webkit-box;
-  -webkit-line-clamp: 2; // 최대 2줄
-  -webkit-box-orient: vertical;
-  word-break: break-word; // 긴 단어 줄바꿈
+  color: ${({ $darkMode }) => $darkMode ? '#e2e8f0' : '#2d3748'};
+  margin-bottom: 0.3rem;
+  line-height: 1.3;
 `;
 
 const PlanItemDuration = styled.div`
-  font-size: 0.65rem; // 크기 줄임
-  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  font-size: 0.7rem;
+  color: ${({ $darkMode }) => $darkMode ? '#a0aec0' : '#718096'};
   font-weight: 500;
 `;
 
-const PlanViewAllButton = styled.button`
-  width: 100%;
-  padding: 0.5rem 0.8rem; // 패딩 줄임
-  background: ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 193, 7, 0.2)' 
-    : 'rgba(255, 193, 7, 0.15)'};
-  color: ${({ $darkMode }) => $darkMode ? '#fff' : '#333'};
-  border: 1px solid ${({ $darkMode }) => $darkMode 
-    ? 'rgba(255, 193, 7, 0.3)' 
-    : 'rgba(255, 193, 7, 0.25)'};
-  border-radius: 0.4rem; // 반지름 줄임
-  font-size: 0.75rem; // 크기 줄임
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+// 로딩 관련 스타일 컴포넌트들 추가 (파일 하단의 스타일 컴포넌트 섹션에 추가)
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 1rem;
+  margin-left: 2rem;
+`;
+
+const LoadingSpinner = styled.div`
+  width: 40px;
+  height: 40px;
+  border: 3px solid ${({ $darkMode }) => $darkMode ? '#444' : '#f3f3f3'};
+  border-top: 3px solid #ffc400;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
   
-  &:hover {
-    background: ${({ $darkMode }) => $darkMode 
-      ? 'rgba(255, 193, 7, 0.3)' 
-      : 'rgba(255, 193, 7, 0.25)'};
-    transform: translateY(-1px);
-    box-shadow: ${({ $darkMode }) => $darkMode 
-      ? '0 2px 6px rgba(255, 193, 7, 0.2)' 
-      : '0 2px 6px rgba(255, 193, 7, 0.15)'};
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 `;
+
+const LoadingText = styled.div`
+  font-size: 0.9rem;
+  color: ${({ $darkMode }) => $darkMode ? '#ccc' : '#666'};
+  text-align: center;
+`;
+
+const EmptyState = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+`;
+
+const EmptyText = styled.div`
+  font-size: 0.9rem;
+  color: ${({ $darkMode }) => $darkMode ? '#999' : '#999'};
+  text-align: center;
+`;
+
