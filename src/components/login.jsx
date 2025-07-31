@@ -45,7 +45,7 @@ export default function Login() {
       payload.append("username", formData.username);
       payload.append("password", formData.password);
   
-      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
   
       const { data: tokenRes } = await axios.post(
         `${BASE_URL}/token`,

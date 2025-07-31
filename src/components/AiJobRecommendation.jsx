@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 // 벡엔드 API 서버 주소 (환경 변수로 관리하는 것을 추천합니다)
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 // API 요청을 위한 클라이언트 설정
 const apiClient = axios.create({
   baseURL: BASE_URL,

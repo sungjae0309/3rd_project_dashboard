@@ -147,7 +147,7 @@ export default function Register() {
     if (err) return alert(err);
 
     try {
-      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+      const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
       // 1) 회원가입
       await axios.post(`${BASE_URL}/users/signup/id`, {
         ...formData,

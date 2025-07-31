@@ -1,7 +1,7 @@
 // ──────────────── src/api/fetchMcpStreamingResponse.js ────────────────
 
 // export async function fetchMcpStreamingResponse(text, userId, token, onMessageCallback) {
-//   const sessionRes = await fetch("http://http://192.168.101.51:8000/mcp", {
+//   const sessionRes = await fetch("http://http://192.168.101.7:8000/mcp", {
 //     method: "POST",
 //     headers: {
 //       "Content-Type": "application/json",
@@ -32,7 +32,7 @@
 
 //   if (!endpoint) throw new Error("MCP endpoint not received");
 
-//   const eventSource = new EventSource(`http://http://192.168.101.51:8000${endpoint}`);
+//   const eventSource = new EventSource(`http://http://192.168.101.7:8000${endpoint}`);
 
 //   eventSource.onmessage = (event) => {
 //     onMessageCallback(event.data);

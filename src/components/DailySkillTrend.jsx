@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import axios from 'axios';
 import { FaSearch, FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 // 선 그래프를 그리기 위한 간단한 SVG 차트 컴포넌트 (이전과 동일)
 const SimpleLineChart = ({ data, darkMode }) => {

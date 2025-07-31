@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 export default function RoadmapCategory({ onSelectCategory, darkMode }) {
   const [categoryStats, setCategoryStats] = useState({

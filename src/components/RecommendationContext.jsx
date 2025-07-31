@@ -33,7 +33,7 @@ export const RecommendationProvider = ({ children }) => {
     // AuthContext에서 로그인 상태 가져오기
     const { isLoggedIn, user, isInitialized: authInitialized } = useAuth();
 
-    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
     // 로그인 상태가 변경될 때 AI 추천 공고 로드
     useEffect(() => {

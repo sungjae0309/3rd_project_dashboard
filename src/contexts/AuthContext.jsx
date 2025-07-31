@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     // userId가 없으면 API에서 사용자 정보를 가져옴
     if (!userId) {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000'}/users/me`, {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000'}/users/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

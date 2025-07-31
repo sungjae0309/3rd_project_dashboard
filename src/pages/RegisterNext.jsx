@@ -12,7 +12,7 @@ const EXP_MAIN = ["인턴","부트캠프","프로젝트","대외활동"];
 const EXP_SUB_ACTIVITY = ["동아리","학회","공모전"];
 const SKILL_LEVELS = ["초급","중급","고급"];
 // Before
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 const toIsoDate = d => (d ? new Date(d).toISOString().slice(0,10) : "");
 

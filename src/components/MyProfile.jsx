@@ -4,7 +4,7 @@ import styled, { css } from "styled-components";
 import axios from "axios";
 import { FaEdit, FaSave, FaTrash, FaPlus, FaChevronDown } from "react-icons/fa";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 const trimLines = (str = "") => str.split(/\n|\r/).map((l) => l.trim()).filter(Boolean);
 
 // RegisterNext.jsx에서 가져온 상수들
@@ -41,6 +41,14 @@ export default function MyProfile() {
   const [edit, setEdit] = useState({});
   const [activeTab, setActiveTab] = useState("basic");
   const textRefs = useRef({});
+  
+  // 비밀번호 변경 관련 상태 추가
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   // RegisterNext.jsx에서 가져온 상태들
   const [experiences, setExperiences] = useState([]);
@@ -323,6 +331,48 @@ export default function MyProfile() {
     } catch (err) {
       console.error("❌ 저장 실패:", err);
       alert("저장 실패: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // 비밀번호 변경 함수 추가
+  const handlePasswordChange = async () => {
+    const { currentPassword, newPassword, confirmPassword } = passwordData;
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert("모든 필드를 입력해주세요.");
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      alert("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      alert("비밀번호는 최소 6자 이상이어야 합니다.");
+      return;
+    }
+    
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      alert("다시 로그인해주세요.");
+      return;
+    }
+    
+    try {
+      await axios.put(`${BASE_URL}/users/me/password`, {
+        current_password: currentPassword,
+        new_password: newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert("✅ 비밀번호가 성공적으로 변경되었습니다!");
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPasswordForm(false);
+    } catch (err) {
+      console.error("❌ 비밀번호 변경 실패:", err);
+      alert("비밀번호 변경 실패: " + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -620,6 +670,53 @@ export default function MyProfile() {
             <Field label="닉네임" keyName="nickname" />
             <Field label="이름" keyName="name" />
             <Field label="전화번호" keyName="phone_number" />
+            
+            {/* 비밀번호 변경 섹션 추가 */}
+            <FieldRow>
+              <Label>비밀번호</Label>
+              <FieldContent>
+                {showPasswordForm ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <Input
+                      type="password"
+                      placeholder="현재 비밀번호"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    />
+                    <Input
+                      type="password"
+                      placeholder="새 비밀번호"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                    <Input
+                      type="password"
+                      placeholder="새 비밀번호 확인"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <IconBtn onClick={handlePasswordChange} style={{ backgroundColor: '#ffa500', color: '#fff', border: 'none' }}>
+                        <FaSave />
+                      </IconBtn>
+                      <IconBtn onClick={() => {
+                        setShowPasswordForm(false);
+                        setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                      }}>
+                        ×
+                      </IconBtn>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <Value style={{ flex: 1 }}>••••••••</Value>
+                    <IconBtn onClick={() => setShowPasswordForm(true)}>
+                      <FaEdit />
+                    </IconBtn>
+                  </div>
+                )}
+              </FieldContent>
+            </FieldRow>
           </SectionContainer>
         </FormArea>
         )}

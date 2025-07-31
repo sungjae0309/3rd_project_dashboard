@@ -4,7 +4,7 @@ import { FaArrowLeft, FaBuilding, FaCalendarAlt, FaCheckCircle, FaLaptop, FaCloc
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 const fetchRoadmapById = async (roadmapId) => {
   const token = localStorage.getItem("accessToken");
   const response = await axios.get(`${BASE_URL}/roadmaps/${roadmapId}`, {

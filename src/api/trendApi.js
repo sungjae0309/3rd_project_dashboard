@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000'; // FastAPI 서버 URL
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000'; // FastAPI 서버 URL
 
 // 직무명 리스트 조회
 export const getJobNames = async () => {

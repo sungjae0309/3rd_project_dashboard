@@ -7,7 +7,7 @@ import { FaTrash, FaPlus, FaCalendarAlt, FaEdit, FaFilter, FaSync, FaSortAmountU
 import { useJobNames } from '../contexts/JobNamesContext';
 import TodoModal from './TodoModal'; // 1. 방금 만든 모달 컴포넌트 import
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 // 헬퍼 함수
 const toKey = (d) => new Date(d).toISOString().split("T")[0];

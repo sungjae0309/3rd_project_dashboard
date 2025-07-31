@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { FaArrowLeft, FaBookmark, FaFilter, FaSearch, FaCalendarAlt, FaMapMarkerAlt, FaClock, FaGraduationCap, FaBook, FaMoneyBillWave, FaExternalLinkAlt, FaPlay, FaStop } from 'react-icons/fa';
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 export default function RoadmapList({ category, onSelectRoadmap, onBack, darkMode, onSaveRoadmap, onUnsaveRoadmap }) {
   const [roadmaps, setRoadmaps] = useState([]);

@@ -4,7 +4,7 @@ import styled from "styled-components";
 import axios from "axios";
 import { FaHeart, FaTrashAlt } from "react-icons/fa";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 export const fetchSavedJobs = async (setSavedJobs) => {
   const token = localStorage.getItem("accessToken");

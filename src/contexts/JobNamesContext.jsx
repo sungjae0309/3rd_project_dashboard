@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const JobNamesContext = createContext();
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 export const useJobNames = () => {
   const context = useContext(JobNamesContext);

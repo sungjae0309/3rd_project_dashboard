@@ -4,7 +4,7 @@ import styled from "styled-components";
 import axios from "axios";
 import { useJobNames } from "../contexts/JobNamesContext";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 export default function JobCardFiltered({ filters, setFilters, darkMode = false }) {
 
   const [techStacks, setTechStacks] = useState([]);

@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import axios from 'axios';
 import { FaTimes } from 'react-icons/fa';
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 export default function TodoModal({ darkMode, todo, onClose, onSave }) {
     const [formData, setFormData] = useState({

@@ -9,7 +9,7 @@ export default function RecommendationReason({ darkMode, job, onClose }) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const token = localStorage.getItem("accessToken");
-    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
     useEffect(() => {
         if (!job) return;

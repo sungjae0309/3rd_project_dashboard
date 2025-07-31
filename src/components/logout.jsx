@@ -6,7 +6,7 @@ import axios from "axios";
 import { clearVisualizationCache, clearRecommendationCache } from "../api/mcp";
 import { useAuth } from "../contexts/AuthContext"; // AuthContext 사용
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 export default function LogoutPage() {
   const navigate = useNavigate();

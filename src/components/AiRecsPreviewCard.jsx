@@ -10,7 +10,7 @@ import { useRecommendations } from './RecommendationContext';
 // 환경변수 안전하게 접근
 const BASE_URL = typeof process !== 'undefined' && process.env.REACT_APP_API_BASE_URL 
   ? process.env.REACT_APP_API_BASE_URL 
-  : "http://192.168.101.51:8000";
+  : "http://192.168.101.7:8000";
 
 // 애니메이션 정의
 const fadeIn = keyframes`
@@ -259,6 +259,12 @@ const fetchJobRecommendations = async () => {
             job_name: job.job_name,
             score: job.score
         }));
+        
+        // 모든 점수가 0점인지 확인
+        const allZeroScores = jobsData.every(job => job.score === 0);
+        if (allZeroScores && jobsData.length > 0) {
+            console.warn('⚠️ [AiRecsPreviewCard] 모든 직무 추천 점수가 0점입니다. 백엔드 추천 알고리즘을 확인해주세요.');
+        }
         
         setJobRecommendations(jobsData);
         console.log('✅ [AiRecsPreviewCard] 직무 추천 데이터 로딩 완료:', jobsData);

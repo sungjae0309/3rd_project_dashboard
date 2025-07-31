@@ -34,7 +34,7 @@ import axios from "axios";
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
 import DailySkillTrend from "./DailySkillTrend";
 // 메인 화면과 동일한 API 주소 사용
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 export default function CareerRoadmapMain({ darkMode = false, setSelectedPage, roadmapData = { bootcamps: [], courses: [] } }) {
   // 추천 로드맵 상태 추가

@@ -3,7 +3,7 @@ import styled, { css } from "styled-components";
 import { FaHeart, FaRegHeart, FaArrowLeft, FaTimes, FaMoneyBillWave, FaExternalLinkAlt } from "react-icons/fa";
 import axios from "axios";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 export default function RoadmapListPage({ darkMode, type, onRoadmapDetail, setSelectedPage, onSaveRoadmap, onUnsaveRoadmap }) {
   const [roadmaps, setRoadmaps] = useState([]);

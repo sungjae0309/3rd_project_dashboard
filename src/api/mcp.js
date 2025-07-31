@@ -1,6 +1,6 @@
 // src/api/mcp.js
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 /**
  * 내 채팅 세션 ID 목록 조회

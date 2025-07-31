@@ -6,7 +6,7 @@ import axios from 'axios';
 import { FaClipboardCheck, FaPlus, FaCalendarAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { useJobNames } from '../contexts/JobNamesContext'; // 직무 목록 Context
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.51:8000';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.101.7:8000';
 
 function TodoPreview({ darkMode, setSelectedPage }) {
   const [hasSchedule, setHasSchedule] = useState(false);

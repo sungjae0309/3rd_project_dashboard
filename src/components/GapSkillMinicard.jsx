@@ -10,7 +10,7 @@ export default function GapSkillMiniCard({ selectedJob, darkMode }) {
     if (!selectedJob) return;
     setLoading(true);
     const token = localStorage.getItem("accessToken");
-    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+    const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
     axios
       .get(`${BASE_URL}/visualization/gap-analysis`, {
         params: { category: selectedJob },

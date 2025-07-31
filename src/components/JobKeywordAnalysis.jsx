@@ -6,7 +6,7 @@ import "tippy.js/animations/scale.css";
 import axios from "axios";
 import { FaCalendarDay, FaCalendarWeek, FaInfoCircle } from "react-icons/fa";
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 export default function JobKeywordAnalysis({ selectedJob, darkMode, selectedFieldType, isMainPage = false, onDataUpdate }) {
   const [trendData, setTrendData] = useState([]);

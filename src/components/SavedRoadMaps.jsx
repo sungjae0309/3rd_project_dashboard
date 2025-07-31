@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { FaHeart, FaTrashAlt } from "react-icons/fa";
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.51:8000";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://192.168.101.7:8000";
 
 // ✨ 1. [수정] props로 setSavedRoadmaps 대신 savedRoadmaps를 받습니다.
 export default function SavedRoadmaps({ darkMode, userId, onRoadmapDetail, savedRoadmaps, title = "찜한 로드맵", onUnsaveRoadmap }) {
