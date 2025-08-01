@@ -94,7 +94,7 @@ export default function Sidebar({
   return (
     <Wrapper $darkMode={darkMode} collapsed={collapsed}>
       <TopBar>
-        <Logo onClick={() => setSelectedPage("aijob")} collapsed={collapsed}>
+        <Logo onClick={() => setSelectedPage("dashboard")} collapsed={collapsed}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <LogoText collapsed={collapsed}>JOB</LogoText>
             <LogoText collapsed={collapsed} style={{ color: "#fff" }}>자</LogoText>

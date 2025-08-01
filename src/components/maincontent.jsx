@@ -33,7 +33,7 @@ import AiJobRecommendation from "./AiJobRecommendation";
 import JobKeywordAnalysis from "./JobKeywordAnalysis";
 import { useNavigate } from "react-router-dom";
 import TodoPreview from "./TodoPreview"; 
-
+import { v4 as uuidv4 } from 'uuid';
 import axios from "axios";
 import { fetchMcpResponse, createChatSession, sendChatMessage } from "../api/mcp";
 import { useLocation } from "react-router-dom";
@@ -236,7 +236,7 @@ useEffect(() => {
   const [chatHistory, setChatHistory] = useState([]);
   const [sessionId] = useState(() => {
     const saved = localStorage.getItem("chatSessionId");
-    const id = saved || crypto.randomUUID();
+    const id = saved || uuidv4();
     localStorage.setItem("chatSessionId", id);
     return id;
   }); 
