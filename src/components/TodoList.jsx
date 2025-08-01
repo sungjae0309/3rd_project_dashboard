@@ -83,6 +83,7 @@ export default function TodoList({ darkMode = false }) {
       if (savedScheduleInfo) {
           try {
               const parsedInfo = JSON.parse(savedScheduleInfo);
+              console.log('저장된 일정 정보 복원:', parsedInfo);
               setGeneratedScheduleInfo(parsedInfo);
           } catch (error) {
               console.error('저장된 일정 정보 파싱 실패:', error);
@@ -147,8 +148,10 @@ export default function TodoList({ darkMode = false }) {
             const scheduleInfo = {
                 job_title: genJob,
                 days: genDays,
-                created_at: new Date().toLocaleDateString()
+                created_at: new Date().toLocaleDateString(),
+                generated_at: new Date().toISOString()
             };
+            console.log('TodoList에서 새로 생성된 일정 정보:', scheduleInfo);
             setGeneratedScheduleInfo(scheduleInfo);
             localStorage.setItem('generatedScheduleInfo', JSON.stringify(scheduleInfo));
             
@@ -262,6 +265,7 @@ export default function TodoList({ darkMode = false }) {
                         {(generatedScheduleInfo || stats.total_count > 0) ? (
                             // 생성된 일정 정보 표시
                             <>
+                                {console.log('현재 generatedScheduleInfo:', generatedScheduleInfo)}
                                 <ScheduleInfoHeader>
                                     <h4><FaCalendarAlt /> 생성된 학습 일정</h4>
                                     <ScheduleDeleteButton onClick={handleDeleteAllSchedule}>
@@ -271,11 +275,11 @@ export default function TodoList({ darkMode = false }) {
                                 <ScheduleInfoContent>
                                     <ScheduleInfoItem>
                                         <ScheduleInfoLabel>직무:</ScheduleInfoLabel>
-                                        <ScheduleInfoValue>{generatedScheduleInfo?.job_title || "AI 추천"}</ScheduleInfoValue>
+                                        <ScheduleInfoValue>{generatedScheduleInfo?.job_title || "직무 정보 없음"}</ScheduleInfoValue>
                                     </ScheduleInfoItem>
                                     <ScheduleInfoItem>
                                         <ScheduleInfoLabel>기간:</ScheduleInfoLabel>
-                                        <ScheduleInfoValue>{generatedScheduleInfo?.days || "15"}일</ScheduleInfoValue>
+                                        <ScheduleInfoValue>{generatedScheduleInfo?.days ? `${generatedScheduleInfo.days}일` : "기간 정보 없음"}</ScheduleInfoValue>
                                     </ScheduleInfoItem>
                                 </ScheduleInfoContent>
                             </>

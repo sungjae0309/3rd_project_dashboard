@@ -141,6 +141,16 @@ function TodoPreview({ darkMode, setSelectedPage }) {
         );
         // ▲▲▲ 수정 완료 ▲▲▲
         
+        // 성공 후, 선택한 직무와 기간 정보를 localStorage에 저장
+        const scheduleInfo = {
+            job_title: jobInput,
+            days: daysInput,
+            created_at: new Date().toLocaleDateString(),
+            generated_at: new Date().toISOString()
+        };
+        localStorage.setItem('generatedScheduleInfo', JSON.stringify(scheduleInfo));
+        console.log('TodoPreview에서 저장된 일정 정보:', scheduleInfo);
+        
         // 성공 후, 일정 다시 확인
         await checkSchedule();
     } catch (err) {
